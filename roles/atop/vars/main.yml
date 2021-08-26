@@ -1,0 +1,2 @@
+---
+atop_daily_task_file_path: "/usr/share/atop/atop.daily"  # atop config file location – this might be Debian-specific.

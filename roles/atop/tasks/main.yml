@@ -1,0 +1,21 @@
+---
+- name: Ensure atop is installed
+  ansible.builtin.package:
+    name: atop
+    state: present
+
+- name: Ensure atop is configured to log at the specified interval
+  ansible.builtin.lineinfile:
+    path: {{ atop_daily_task_file_path }}
+    regexp: "^LOGINTERVAL="
+    line: "LOGINTERVAL={{ log_interval_secs }}"
+  notify:
+    - Restart atop
+
+- name: Ensure atop is configured to clean up logs the specified number of days old
+  ansible.builtin.lineinfile:
+    path: {{ atop_daily_task_file_path }}
+    regexp: "^( (sleep 3; find $LOGPATH"
+    line: "( (sleep 3; find $LOGPATH -name 'atop_*' -mtime +{{ log_retention_days }} -exec rm {} \;)& )"
+  notify:
+    - Restart atop
