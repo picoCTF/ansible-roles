@@ -1,0 +1,34 @@
+---
+- name: Ensure GPG dependencies are installed
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker repository GPG key is present
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    keyring: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Ensure stable Docker repository is added
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+
+- name: Ensure Docker Engine is installed
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker is running
+  ansible.builtin.service:
+    name: docker
+    state: started
