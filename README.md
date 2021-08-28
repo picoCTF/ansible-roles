@@ -5,8 +5,8 @@ containing various roles for configuring platform components and compatible chal
 backends. All included roles are designed to be idempotent (i.e. can be repeatedly re-applied
 without causing issues).
 
-Note that as of this writing, all roles have only been tested with Ubuntu 20.04 LTS, though they may
-work on other platforms with minor changes.
+Note that as of this writing, all roles have only been tested on amd64 Ubuntu 20.04 LTS hosts,
+though they may work on other platforms with minor changes.
 
 ## Quick Start
 
@@ -46,6 +46,10 @@ work on other platforms with minor changes.
     ```shell
     $ ansible-playbook -i sample-hostname.com, -u ubuntu --private-key /path/to/key_file
     ```
+
+    Please note the trailing comma if specifying a single hostname using the `-i` flag. This is
+    required so that Ansible parses the argument as a list of hosts, rather than the path to an
+    inventory file.
 
     Note that the specified SSH user must be able to elevate to root [using
     `become`](https://docs.ansible.com/ansible/latest/user_guide/become.html).
