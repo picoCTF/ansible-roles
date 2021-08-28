@@ -30,7 +30,7 @@ galaxy_info:
   platforms:
   - name: Ubuntu
     versions:
-    - all
+    - focal
 
   galaxy_tags: ["picoctf", "atop", "monitoring"]
     # List tags for your role here, one per line. A tag is a keyword that describes
