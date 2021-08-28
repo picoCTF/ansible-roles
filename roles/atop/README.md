@@ -1,4 +1,4 @@
-# atop monitoring
+# atop
 
 Installs [`atop`](https://github.com/Atoptool/atop) on a host and configures it to log process metrics (at a 60s granularity, by default).
 
