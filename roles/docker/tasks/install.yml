@@ -35,19 +35,3 @@
   ansible.builtin.service:
     name: docker
     state: started
-
-# Add users to Docker group
-
-- name: Ensure docker group exists
-  ansible.builtin.group:
-    name: docker
-    state: present
-  when: docker_group_users|length > 0
-
-- name: Ensure users are members of docker group
-  ansible.builtin.user:
-    name: "{{ item }}"
-    groups: docker
-    append: yes
-  with_items: "{{ docker_group_users }}"
-  when: docker_group_users|length > 0
