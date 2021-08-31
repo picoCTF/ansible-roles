@@ -25,3 +25,4 @@ listing of additional flags to modify the output. Some flags which may be partic
 | --- | --- | --- |
 | `log_interval_secs` | How frequently atop should log the system state (in seconds) | 60 |
 | `log_retention_days` | How long logs should be stored (in days) | 28 |
+| `upgrade` | Whether to upgrade atop if already installed | false |

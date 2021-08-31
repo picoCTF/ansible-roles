@@ -2,7 +2,7 @@
 - name: Ensure atop is installed
   ansible.builtin.apt:
     name: atop
-    state: present
+    state: "{{ 'latest' if upgrade else 'present' }}"
     update_cache: yes
 
 - name: Ensure atop is configured to log at the specified interval

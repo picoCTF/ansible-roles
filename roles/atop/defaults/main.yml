@@ -1,3 +1,4 @@
 ---
 log_interval_secs: 60  # How frequently atop should log the system state (in seconds)
 log_retention_days: 28  # How long logs should be stored (in days)
+upgrade: no  # Whether to upgrade atop if already installed
