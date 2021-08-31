@@ -3,7 +3,8 @@
 An [Ansible collection](https://docs.ansible.com/ansible/latest/user_guide/collections_using.html)
 containing various roles for configuring platform components and compatible challenge server
 backends. All included roles are designed to be idempotent (i.e. can be repeatedly re-applied
-without causing issues).
+without causing issues), unless the variable `upgrade: yes` is set, in which case packages may be
+automatically upgraded.
 
 Note that as of this writing, all roles have only been tested on amd64 Ubuntu 20.04 LTS hosts,
 though they may work on other platforms with minor changes.
@@ -23,15 +24,17 @@ though they may work on other platforms with minor changes.
     ---
     - hosts: all  # or a group from your Ansible inventory
       tasks:
-        roles:
-          - picoctf.ansible_roles.<role_name>
-          - role: picoctf.ansible_roles.<role_name>  # use this syntax to override roles' default variables
-            vars:
-              sample: "value"
+        - include_role:
+            name: picoctf.ansible_roles.<role_name>
+          vars:
+            sample: "value"
     ```
 
     Note that all roles in this collection already specify `become: yes` to elevate to root as
     necessary, so you do not need to handle that in your playbook.
+
+    In our example playbook, we use `include_role` tasks rather than a top-level `roles:` section so
+    that variables can be scoped to roles rather than the entire play.
 
 1. Run the playbook:
 
@@ -51,5 +54,5 @@ though they may work on other platforms with minor changes.
     required so that Ansible parses the argument as a list of hosts, rather than the path to an
     inventory file.
 
-    Note that the specified SSH user must be able to elevate to root [using
+    Also note that the specified SSH user must be able to elevate to root [using
     `become`](https://docs.ansible.com/ansible/latest/user_guide/become.html).
