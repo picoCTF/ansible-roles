@@ -1,2 +1,3 @@
 ---
 docker_group_users: []  # Adds these users to the `docker` group, granting them access to the daemon without using `sudo`.
+upgrade: no  # Whether to upgrade Docker if already installed

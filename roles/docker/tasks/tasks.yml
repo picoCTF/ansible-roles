@@ -28,7 +28,7 @@
       - docker-ce
       - docker-ce-cli
       - containerd.io
-    state: present
+    state: "{{ 'latest' if upgrade else 'present' }}"
     update_cache: yes
 
 - name: Ensure Docker is running
