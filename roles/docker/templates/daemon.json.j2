@@ -1,0 +1,11 @@
+{
+    {% if tls_access %}
+    "tlsverify": true,
+    "tlscacert": "{{ ca_cert_path }}",
+    "tlscert": "{{ server_cert_path }}",
+    "tlskey": "{{ server_key_path }}",
+    {% endif %}
+
+    "hosts": ["unix:///var/run/docker.sock"{% if tls_access %}, "tcp://0.0.0.0:2376"{% endif %}],
+    "containerd": "/run/containerd/containerd.sock"
+}
