@@ -1,2 +1,14 @@
 ---
-# vars file for docker
+tls_cert_path: "/root/.docker_certs"  # Where to store generated TLS certs on the host machine. A subdirectory of /root is chosen so that the docker certs are not accessible even if a user manages to escape from a container (as a non-root host user, which should be the case when using user namespaces)
+
+ca_key_path: "{{ tls_cert_path }}/ca-key.pem"
+ca_csr_path: "{{ tls_cert_path }}/ca.csr"
+ca_cert_path: "{{ tls_cert_path }}/ca.pem"
+
+server_key_path: "{{ tls_cert_path }}/server-key.pem"
+server_csr_path: "{{ tls_cert_path }}/server.csr"
+server_cert_path: "{{ tls_cert_path }}/server.pem"
+
+client_key_path: "{{ tls_cert_path }}/client-key.pem"
+client_csr_path: "{{ tls_cert_path }}/client.csr"
+client_cert_path: "{{ tls_cert_path }}/client.pem"
