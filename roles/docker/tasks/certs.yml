@@ -169,7 +169,7 @@
     privatekey_path: "{{ client_key_path }}"
     common_name: "client"
     extended_key_usage:
-      - serverAuth
+      - clientAuth
     force: yes
   when: recreate_client_cert
 
