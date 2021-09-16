@@ -1,0 +1,24 @@
+---
+
+# Defines a custom parent cgroup for spawned containers, limiting
+# total resource consumption to 90% of available CPU and memory.
+
+# Enables memory and swap accounting (typically disabled by default
+# on Debian-based systems) in order to support memory limits.
+
+- name: Check if 50-cloudimg-settings GRUB config exists
+  # Ubuntu cloud images use an /etc/default/grub.d/50-cloudimg-settings.cfg
+  # config override file rather than the usual /etc/default/grub
+  ansible.builtin.stat:
+    path: "{{ grub_cloudimg_config_path }}"
+  register: grub_cloudimg_config
+
+- name: Ensure memory cgroup and swap accounting are enabled
+  ansible.builtin.lineinfile:
+    dest: "{{ grub_cloudimg_config_path if grub_cloudimg_config.stat.exists else '/etc/default/grub' }}"
+    regexp: '^(GRUB_CMDLINE_LINUX_DEFAULT=(?!.*cgroup_enable=memory swapaccount=1).*)\"$'
+    line: '\1 cgroup_enable=memory swapaccount=1"'
+    backrefs: yes
+  notify:
+    - Update GRUB
+    - Reboot

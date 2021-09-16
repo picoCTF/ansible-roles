@@ -3,4 +3,5 @@
 - { include: group.yml, become: yes }
 - { include: certs.yml, become: yes, when: tls_access }
 - { include: storage.yml, become: yes, when: storage_quotas}
+- { include: parent-cgroup.yml, become: yes }
 - { include: config.yml, become: yes }

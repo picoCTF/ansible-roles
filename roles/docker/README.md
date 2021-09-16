@@ -42,6 +42,18 @@ However, this is **highly discouraged** in any situation where untrusted users m
 the filesystem, as a malicious user will easily be able to fill the disk and render the machine
 inoperable.
 
+### Default cgroup parent and memory accounting
+
+The Docker daemon is configured to use a custom cgroup parent for all spawned containers. This
+cgroup limits the CPU and memory resources available to all Docker containers to 90% of the system's
+total resources to ensure that essential services like `sshd` and `atop` can still run regardless of
+the resources used by running containers.
+
+Memory and swap accounting [is
+enabled](https://docs.docker.com/engine/install/linux-postinstall/#your-kernel-does-not-support-cgroup-swap-limit-capabilities)
+in order to support the limits enforced by this parent cgroup. This also enables per-container
+[memory and swap limits](https://docs.docker.com/config/containers/resource_constraints/#memory).
+
 ## Role Variables
 
 ### General settings
