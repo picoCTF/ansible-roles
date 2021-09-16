@@ -14,3 +14,5 @@ client_csr_path: "{{ tls_cert_path }}/client.csr"
 client_cert_path: "{{ tls_cert_path }}/client.pem"
 
 systemd_drop_in_dir: "/etc/systemd/system/docker.service.d"
+
+storage_mount_point: "/mnt/docker-data"

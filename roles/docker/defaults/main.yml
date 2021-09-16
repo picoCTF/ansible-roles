@@ -8,3 +8,6 @@ tls_SANs: ["DNS:localhost", "IP:127.0.0.1", "DNS:host.docker.internal"]  # Subje
 tls_renew_certs: no  # Whether to generate new TLS certs if they have expired
 tls_fetch_certs: yes  # Whether to fetch generated client certs to the host running Ansible
 tls_fetched_cert_path: "./fetched/certs"  # Where fetched client certs will be stored on the host running Ansible
+
+storage_quotas: yes  # Whether to enable storage quotas by using a separate XFS filesystem for the Docker daemon state.
+storage_device: "/dev/nvme1n1"  # The block device to format and mount as an XFS filesystem.

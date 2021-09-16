@@ -6,6 +6,11 @@
     "tlskey": "{{ server_key_path }}",
     {% endif %}
 
+    {% if storage_quotas %}
+    "data-root": "{{ storage_mount_point }}",
+    {% endif %}
+
     "hosts": ["unix:///var/run/docker.sock"{% if tls_access %}, "tcp://0.0.0.0:2376"{% endif %}],
+    "storage-driver": "overlay2",
     "containerd": "/run/containerd/containerd.sock"
 }

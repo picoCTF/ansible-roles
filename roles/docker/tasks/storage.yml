@@ -1,0 +1,25 @@
+---
+
+# Use a separate XFS volume for Docker graph storage in order
+# to enable volume/writable layer storage quotas
+
+- name: Ensure Docker data volume is formatted as XFS
+  community.general.filesystem:
+    dev: "{{ storage_device }}"
+    fstype: xfs
+
+- name: Ensure the Docker data volume is mounted
+  ansible.posix.mount:
+    path: "{{ storage_mount_point }}"
+    src: "{{ storage_device }}"
+    fstype: xfs
+    opts: pquota
+    state: mounted
+
+- name: Grow the filesystem if necessary
+  # community.general.filesystem cannot grow XFS filesystems unless they are already
+  # mounted, hence this additional invocation after ansible.posix.mount.
+  community.general.filesystem:
+    dev: "{{ storage_device }}"
+    fstype: xfs
+    resizefs: yes

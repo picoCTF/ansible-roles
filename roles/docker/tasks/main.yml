@@ -2,4 +2,5 @@
 - { include: install.yml, become: yes }
 - { include: group.yml, become: yes }
 - { include: certs.yml, become: yes, when: tls_access }
+- { include: storage.yml, become: yes, when: storage_quotas}
 - { include: config.yml, become: yes }

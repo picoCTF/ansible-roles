@@ -22,6 +22,25 @@ Names](https://en.wikipedia.org/wiki/Subject_Alternative_Name) from which the so
 accessible. By default, the generated TLS client certificates are fetched to the host running
 Ansible. See [below](#tls-docker-socket-access-settings) for a full list of configurable options.
 
+### Storage quotas
+
+The Docker daemon state is stored on a separate device, which is formatted with the
+[XFS](https://en.wikipedia.org/wiki/XFS) filesystem. By mounting this filesystem with the [`pquota`
+mount
+option](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/storage_administration_guide/xfsquota)
+and using the [overlay2 storage
+driver](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-storage-driver), we can
+enforce size limits for [Docker volumes](https://github.com/moby/moby/pull/41330) (useful for
+webshell home directories) and the [writable layers of
+containers](https://github.com/moby/moby/pull/24771) (useful for preventing abusive disk usage in
+both challenge and webshell containers).
+
+The variable `storage_device` must be specified as the path of the block device to be formatted as
+XFS and used to store the Docker state. This behavior can be disabled, in which case Docker graph
+storage will be stored in `/var/lib/docker` as usual, and storage quotas will not be available.
+However, this is **highly discouraged** in any situation where untrusted users may obtain access to
+the filesystem, as a malicious user will easily be able to fill the disk and render the machine
+inoperable.
 
 ## Role Variables
 
@@ -42,3 +61,10 @@ Ansible. See [below](#tls-docker-socket-access-settings) for a full list of conf
 | `tls_renew_certs` | Whether to generate new CA and client certs if they have expired | false |
 | `tls_fetch_certs` | Whether to fetch generated client certs to the host running Ansible | true |
 | `tls_fetched_cert_path` | Where fetched client certs will be stored on the host running Ansible | ./fetched/certs/ |
+
+### Storage quota settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. | true |
+| `storage_name` | The block device to format and mount as an XFS filesystem. | `/dev/nvme1n1` |
