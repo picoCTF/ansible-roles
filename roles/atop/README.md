@@ -1,5 +1,7 @@
 # atop
 
+## Description
+
 Installs [`atop`](https://github.com/Atoptool/atop) on a host and configures it to log process metrics (at a 60s granularity, by default).
 
 This enables investigation of historical process behavior in the case of unexpectedly high CPU or memory usage, which can be useful if players manage to exploit a challenge or escape from a container.
