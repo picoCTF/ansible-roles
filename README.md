@@ -10,6 +10,13 @@ non-default values. Check each role's README file for a full description of conf
 Note that as of this writing, all roles have only been tested on amd64 Ubuntu 20.04 LTS hosts,
 though they may work on other platforms with minor changes.
 
+## Included Roles
+
+| Name | Description |
+| --- | --- |
+| [atop](./roles/atop/README.md) | Configures atop to regularly log process metrics. |
+| [docker](./roles/docker/README.md) | Configures Docker Engine with ideal settings for platform components. |
+
 ## Quick Start
 
 1. Install the collection:
@@ -18,7 +25,7 @@ though they may work on other platforms with minor changes.
     $ ansible-galaxy install picoctf.ansible_roles
     ```
 
-1. Write a [playbook](https://docs.ansible.com/ansible/latest/user_guide/index.html#writing-tasks-plays-and-playbooks) mapping desired roles to your hosts:
+1. Write a [playbook](https://docs.ansible.com/ansible/latest/user_guide/index.html#writing-tasks-plays-and-playbooks) mapping desired roles to your hosts, e.g.:
 
     ```yaml
     # sample_playbook.yml
@@ -35,7 +42,7 @@ though they may work on other platforms with minor changes.
     necessary, so you do not need to handle that in your playbook.
 
     In our example playbook, we use `include_role` tasks rather than a top-level `roles:` section so
-    that variables can be scoped to roles rather than the entire play.
+    that variables are by default scoped to roles rather than the entire play.
 
 1. Run the playbook:
 
@@ -52,7 +59,7 @@ though they may work on other platforms with minor changes.
     ```
 
     Please note the trailing comma if specifying a single hostname using the `-i` flag. This is
-    required so that Ansible parses the argument as a list of hosts, rather than the path to an
+    required so that Ansible parses the argument as a list of hosts rather than the path to an
     inventory file.
 
     Also note that the specified SSH user must be able to elevate to root [using
