@@ -4,7 +4,7 @@ upgrade: no  # Whether to upgrade Docker if already installed
 
 tls_access: yes  # Whether the Docker daemon should be externally accessible over TLS
 tls_expiration_days: 3650  # Validity period (in days) for generated TLS certs
-tls_SANs: ["DNS:localhost", "IP:127.0.0.1", "DNS:host.docker.internal"]  # Subject Alternative Names to include in the generated TLS certificates
+tls_sans: ["DNS:localhost", "IP:127.0.0.1", "DNS:host.docker.internal"]  # Subject Alternative Names to include in the generated TLS certificates
 tls_renew_certs: no  # Whether to generate new TLS certs if they have expired
 tls_fetch_certs: yes  # Whether to fetch generated client certs to the host running Ansible
 tls_fetched_cert_path: "./fetched/certs"  # Where fetched client certs will be stored on the host running Ansible

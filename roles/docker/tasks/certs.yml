@@ -106,7 +106,7 @@
 
 - name: Determine whether to recreate server cert
   ansible.builtin.set_fact:
-    recreate_server_cert: "{{ not server_cert.stat.exists or recreate_ca_cert or (not server_cert_info is skipped and server_cert_info.subject_alt_name != tls_SANs) }}"
+    recreate_server_cert: "{{ not server_cert.stat.exists or recreate_ca_cert or (not server_cert_info is skipped and server_cert_info.subject_alt_name != tls_sans) }}"
 
 - name: Recreate private key for server
   community.crypto.openssl_privatekey:
@@ -122,7 +122,7 @@
     path: "{{ server_csr_path }}"
     privatekey_path: "{{ server_key_path }}"
     common_name: "localhost"
-    subject_alt_name: "{{ tls_SANs }}"
+    subject_alt_name: "{{ tls_sans }}"
     extended_key_usage:
       - serverAuth
     force: yes
