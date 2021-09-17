@@ -1,0 +1,15 @@
+---
+version: "latest"
+upgrade: no
+download_example_challenges: no
+example_challenge_dir: "{{ challenge_dir }}/examples"
+
+cmgrd_service_enabled: yes
+cmgrd_db: "{{ challenge_dir }}/cmgr.db"
+cmgrd_dir: "{{ challenge_dir }}"
+cmgrd_artifact_dir: "{{ challenge_dir }}"
+cmgrd_logging: "warn"
+cmgrd_interface: "0.0.0.0"
+cmgrd_registry: null
+cmgrd_registry_user: null
+cmgrd_registry_token: null

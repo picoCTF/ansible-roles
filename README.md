@@ -16,6 +16,7 @@ though they may work on other platforms with minor changes.
 | --- | --- |
 | [atop](./roles/atop/README.md) | Configures atop to regularly log process metrics. |
 | [docker](./roles/docker/README.md) | Configures Docker Engine with ideal settings for platform components. |
+| [cmgr](./roles/cmgr/README.md) | Installs cmgr and optionally configures a cmgrd server. |
 
 ## Quick Start
 

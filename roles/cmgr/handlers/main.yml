@@ -1,0 +1,11 @@
+---
+- name: Reload systemd config
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Restart cmgrd
+  ansible.builtin.service:
+    name: cmgrd
+    state: restarted
+  become: yes
