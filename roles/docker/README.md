@@ -69,6 +69,31 @@ containers each (when using the default address pools).
 If you are planning to host any challenges which require more than 5 containers, this subnet prefix
 size must be lowered. See [below](#docker-network-settings) for more details.
 
+### User namespace remapping
+
+While appropriate security options should always be specified when running containers to limit the
+possibility of container escapes, there is always the potential that a malicious user inside a
+container will gain access to the host.
+
+Typically, is especially problematic when the user is already root (UID 0) inside the container (the default for most images), as UIDs are shared between containers and the host.
+
+To minimize the potential impact of a container escape, by default this role enables [user namespace
+remapping](https://docs.docker.com/engine/security/userns-remap/). This means that UID 0 inside
+running containers is mapped to an arbitrary UID with no privileges on the host. If a user manages
+to escape from a container in which they were root, they will find themselves to be a random
+unprivileged user on the host.
+
+There are a few [limitations](https://docs.docker.com/engine/security/userns-remap/#user-namespace-known-limitations) when user namespace remapping is enabled, including:
+
+- Containers cannot share the host PID or network namespaces
+- Files inside host-mounted volumes will have incorrect ownership unless manually changed
+
+These should not be relevant to challenge or webshell toolbox containers.
+
+While not recommended, this functionality can be [disabled](#user-namespace-settings) if necessary.
+Note that any existing image layers and Docker volumes will become inaccessible when user namespace
+remapping is toggled on or off.
+
 ## Role Variables
 
 ### General settings
@@ -102,3 +127,9 @@ size must be lowered. See [below](#docker-network-settings) for more details.
 | --- | --- | --- |
 | `network_ip_pools` | Available IP ranges for Docker network creation. Determines the total number of available networks, along with `network_prefix_length`. | `["172.17.0.0/12", "192.168.0.0/16"]` |
 | `network_prefix_length` | Number of prefix bits to use when creating Docker networks. This determines the number of containers (2^(32-*n*)-3) that can join the network and impacts the total number of available networks.<br><br>The default, `29`, allows 5 containers per network and should be appropriate for most challenge servers. However, this value must be lowered to host challenges with more than 5 running containers per network. | `29` |
+
+### User namespace settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `userns_remap_enabled` | Whether to enable user namespace remapping. | `true` |

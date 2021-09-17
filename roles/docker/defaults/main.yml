@@ -14,3 +14,5 @@ storage_device: "/dev/nvme1n1"
 
 network_ip_pools: ["172.17.0.0/12", "192.168.0.0/16"]
 network_prefix_length: 29
+
+userns_remap_enabled: yes

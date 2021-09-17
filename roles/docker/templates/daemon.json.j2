@@ -21,5 +21,9 @@
         {% endfor %}
     ],
 
+    {% if userns_remap_enabled %}
+    "userns-remap": "default",
+    {% endif %}
+
     "containerd": "/run/containerd/containerd.sock"
 }
