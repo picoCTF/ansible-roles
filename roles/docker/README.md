@@ -42,7 +42,7 @@ However, this is **highly discouraged** in any situation where untrusted users m
 the filesystem, as a malicious user will easily be able to fill the disk and render the machine
 inoperable.
 
-### Default cgroup parent and memory accounting
+### cgroup parent limits and memory accounting
 
 The Docker daemon is configured to use a custom cgroup parent for all spawned containers. This
 cgroup limits the combined CPU and memory available to all Docker containers to 90% of the system's
