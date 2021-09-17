@@ -2,10 +2,10 @@
 
 An [Ansible collection](https://docs.ansible.com/ansible/latest/user_guide/collections_using.html)
 containing various roles for configuring platform components and compatible challenge server
-backends. All included roles are designed to be idempotent (i.e. can be repeatedly re-applied
-without side effects) when run using their default variables. Some roles include variables which may
-cause non-idempotent behavior (upgrading packages, regenerating certificates, etc.) when set to
-non-default values. Check each role's README file for a description of configurable variables.
+backends. All included roles are designed to be idempotent (i.e. repeatedly applicable without side
+effects) when the configured variables are unchanged. However, some roles do define variables which
+may cause non-idempotent behavior (upgrading packages, regenerating certificates, etc.) if set to
+non-default values. Check each role's README file for a full description of configurable variables.
 
 Note that as of this writing, all roles have only been tested on amd64 Ubuntu 20.04 LTS hosts,
 though they may work on other platforms with minor changes.

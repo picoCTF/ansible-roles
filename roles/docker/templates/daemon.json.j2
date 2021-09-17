@@ -1,4 +1,5 @@
 {
+    "hosts": ["unix:///var/run/docker.sock"{% if tls_access %}, "tcp://0.0.0.0:2376"{% endif %}],
     {% if tls_access %}
     "tlsverify": true,
     "tlscacert": "{{ ca_cert_path }}",
@@ -9,8 +10,10 @@
     {% if storage_quotas %}
     "data-root": "{{ storage_mount_point }}",
     {% endif %}
-
-    "hosts": ["unix:///var/run/docker.sock"{% if tls_access %}, "tcp://0.0.0.0:2376"{% endif %}],
     "storage-driver": "overlay2",
+
+    "cgroup-parent": "{{ parent_cgroup }}",
+    "exec-opts": ["native.cgroupdriver=systemd"],
+
     "containerd": "/run/containerd/containerd.sock"
 }

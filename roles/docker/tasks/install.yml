@@ -30,8 +30,5 @@
       - containerd.io
     state: "{{ 'latest' if upgrade else 'present' }}"
     update_cache: yes
-
-- name: Ensure Docker is running
-  ansible.builtin.service:
-    name: docker
-    state: started
+  notify:
+    - Restart Docker

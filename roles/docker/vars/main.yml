@@ -17,3 +17,5 @@ systemd_drop_in_dir: "/etc/systemd/system/docker.service.d"
 
 storage_mount_point: "/mnt/docker-data"
 grub_cloudimg_config_path: "/etc/default/grub.d/50-cloudimg-settings.cfg"
+parent_cgroup: "limit_docker.slice"
+parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"

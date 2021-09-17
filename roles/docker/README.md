@@ -45,11 +45,11 @@ inoperable.
 ### Default cgroup parent and memory accounting
 
 The Docker daemon is configured to use a custom cgroup parent for all spawned containers. This
-cgroup limits the CPU and memory resources available to all Docker containers to 90% of the system's
-total resources to ensure that essential services like `sshd` and `atop` can still run regardless of
-the resources used by running containers.
+cgroup limits the combined CPU and memory available to all Docker containers to 90% of the system's
+total resources in order to ensure that essential services like `sshd` and `atop` can continue to
+run regardless of the resources used by running containers.
 
-Memory and swap accounting [is
+The memory cgroup and swap accounting [are
 enabled](https://docs.docker.com/engine/install/linux-postinstall/#your-kernel-does-not-support-cgroup-swap-limit-capabilities)
 in order to support the limits enforced by this parent cgroup. This also enables per-container
 [memory and swap limits](https://docs.docker.com/config/containers/resource_constraints/#memory).

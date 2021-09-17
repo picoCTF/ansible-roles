@@ -1,0 +1,9 @@
+[Unit]
+Description=Slice limiting combined total resources available to Docker containers
+Before=slices.target
+
+[Slice]
+CPUAccounting=true
+CPUQuota={{ 90 * ansible_processor_nproc }}%
+MemoryAccounting=true
+MemoryMax=90%

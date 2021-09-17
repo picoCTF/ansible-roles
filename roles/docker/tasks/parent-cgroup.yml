@@ -22,3 +22,11 @@
   notify:
     - Update GRUB
     - Reboot
+
+- name: Ensure custom container parent cgroup exists
+  ansible.builtin.template:
+    src: "limit_docker.slice.j2"
+    dest: "{{ parent_cgroup_path }}"
+    force: yes
+  notify:
+    - Reload systemd config
