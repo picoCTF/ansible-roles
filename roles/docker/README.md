@@ -54,6 +54,21 @@ enabled](https://docs.docker.com/engine/install/linux-postinstall/#your-kernel-d
 in order to support the limits enforced by this parent cgroup. This also enables per-container
 [memory and swap limits](https://docs.docker.com/config/containers/resource_constraints/#memory).
 
+### Increased number of available Docker networks
+
+[By default](https://github.com/docker/docker.github.io/issues/8663), Docker networks are created
+with fairly large subnet sizes (/16 for the first 16, then /20) which allow thousands of containers
+to be connected. However, this limits the total number of simultaneous Docker networks to 32.
+
+When running challenge instances or webshell toolbox containers, we want each instance to be on its
+own isolated network. Only having 32 total networks would be extremely limiting, but fortunately it
+is possible to reduce the subnet size of newly created Docker networks. In this role, we set this
+size to /29 by default, which allows for up to ~140,000 simultaneous Docker networks of up to 5
+containers each (when using the default address pools).
+
+If you are planning to host any challenges which require more than 5 containers, this subnet prefix
+size must be lowered. See [below](#docker-network-settings) for more details.
+
 ## Role Variables
 
 ### General settings
@@ -80,3 +95,10 @@ in order to support the limits enforced by this parent cgroup. This also enables
 | --- | --- | --- |
 | `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. | `true` |
 | `storage_name` | The block device to format and mount as an XFS filesystem. | `/dev/nvme1n1` |
+
+### Docker network settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `network_ip_pools` | Available IP ranges for Docker network creation. Determines the total number of available networks, along with `network_prefix_length`. | `["172.17.0.0/12", "192.168.0.0/16"]` |
+| `network_prefix_length` | Number of prefix bits to use when creating Docker networks. This determines the number of containers (2^(32-*n*)-3) that can join the network and impacts the total number of available networks.<br><br>The default, `29`, allows 5 containers per network and should be appropriate for most challenge servers. However, this value must be lowered to host challenges with more than 5 running containers per network. | `29` |

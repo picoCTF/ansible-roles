@@ -15,5 +15,11 @@
     "cgroup-parent": "{{ parent_cgroup }}",
     "exec-opts": ["native.cgroupdriver=systemd"],
 
+    "default-address-pools": [
+        {% for pool in network_ip_pools %}
+        {"base": "{{ pool }}", "size": {{ network_prefix_length }}}{{ "," if not loop.last }}
+        {% endfor %}
+    ],
+
     "containerd": "/run/containerd/containerd.sock"
 }
