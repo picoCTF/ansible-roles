@@ -3,7 +3,7 @@
 # Install Docker Engine
 
 - name: Ensure GPG dependencies are installed
-  apt:
+  ansible.builtin.apt:
     name:
       - apt-transport-https
       - ca-certificates
