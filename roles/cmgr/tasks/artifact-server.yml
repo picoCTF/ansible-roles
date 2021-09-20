@@ -1,0 +1,30 @@
+---
+
+# Configure cmgr-artifact-server to run as a systemd service.
+
+# NOTE: the functionality and installation method of cmgr-artifact-server are
+# planned to change in Q1 2022. These steps are provisional until then.
+
+- name: Ensure cmgr-artifact-server repo is cloned
+  ansible.builtin.git:
+    dest: "{{ artifact_server_dir }}"
+    repo: "{{ artifact_server_repo }}"
+    update: "{{ upgrade }}"
+  register: artifact_server_repo
+
+- name: Ensure artifact server systemd unit exists
+  ansible.builtin.template:
+    src: "cmgr_artifact_server.service.j2"
+    dest: "{{ systemd_unit_dir }}/cmgr_artifact_server.service"
+    lstrip_blocks: yes
+    force: yes
+  register: cmgr_artifact_server_unit
+  notify:
+    - Reload systemd config
+
+- name: Determine whether to restart cmgr artifact server
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart cmgr artifact server
+  when: artifact_server_repo.changed or cmgr_artifact_server_unit.changed

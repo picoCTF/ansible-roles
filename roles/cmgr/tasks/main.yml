@@ -1,3 +1,4 @@
 ---
 - { include: install.yml, become: yes }
 - { include: service.yml, become: yes, when: cmgrd_service_enabled }
+- { include: artifact-server.yml, become: yes, when: artifact_server_enabled }

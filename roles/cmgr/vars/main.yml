@@ -4,4 +4,8 @@ install_location: "/usr/bin"
 cmgr_github_url: "https://github.com/ArmyCyberInstitute/cmgr"
 cmgr_binaries_filename: "cmgr.tar.gz"
 cmgr_examples_filename: "examples.tar.gz"
+
 systemd_unit_dir: "/etc/systemd/system/"
+
+artifact_server_repo: "https://github.com/picoCTF/cmgr-artifact-server.git"
+artifact_server_dir: "/root/cmgr-artifact-server"

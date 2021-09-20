@@ -14,13 +14,13 @@
     dest: "{{ systemd_unit_dir }}/cmgrd.service"
     lstrip_blocks: yes
     force: yes
-  register: cmgrd_unit_updated
+  register: cmgrd_unit
   notify:
     - Reload systemd config
 
 - name: Determine whether to restart the cmgrd service
-  assert: { that: true, quiet: true }
+  ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:
     - Restart cmgrd
-  when: installation_required or cmgrd_unit_updated.changed
+  when: installation_required or cmgrd_unit.changed
