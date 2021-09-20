@@ -14,7 +14,8 @@ daemon settings for use with challenge managers like cmgr.
 `cmgr` and `cmgrd` will be installed to `/usr/bin` and should be available on the default `PATH`.
 
 If enabled, a systemd unit `cmgrd.service` will be added which automatically runs `cmgrd` using the
-specified configuration.
+specified configuration. The `cmgrd` API is exposed over HTTP on port 4200 and does not support
+authentication. It is your responsibility to restrict access to this port.
 
 ## Role Variables
 
@@ -38,10 +39,23 @@ the default configuration, simply invoking `cmgr` from the `/challenges` directo
 | --- | --- | --- |
 | cmgrd_service_enabled | Whether to automatically run `cmgrd` as a systemd service. | `true` |
 | cmgrd_db | Path to cmgr database file | `/challenges/cmgr.db` |
-| cmgrd_dir | Directory containing challenges | `/challenges` |
+| cmgrd_dir | Directory containing challenges. Will be set to `0770` permissions (root access only) | `/challenges` |
 | cmgrd_artifact_dir | Directory for storing artifact bundles | `/challenges` |
 | cmgrd_logging | Logging verbosity | `warn` |
 | cmgrd_interface | Interface to which published challenge ports are bound | `0.0.0.0` |
 | cmgrd_registry | Docker registry for frozen challenges | unset |
 | cmgrd_registry_user | Username to use when authenticating with `cmgrd_registry` | unset |
 | cmgrd_registry_token | Password/token to use when authenticating with `cmgrd_registry` | unset |
+
+### Artifact server configuration (alpha)
+
+[cmgr-artifact-server](https://github.com/picoCTF/cmgr-artifact-server) can optionally be configured
+in order to provide access to artifacts without exposing the entire cmgrd API. The artifact server
+will be accessible on port `4201` if enabled.
+
+The functionality and installation method of cmgr-artifact-server is expected to change in Q1 2022,
+so this feature is considered alpha-level and should be used only for testing.
+
+| Name | Description | Default |
+| --- | --- | --- |
+| artifact_server_enabled | Whether to enable the artifact proxy server. | `false` |

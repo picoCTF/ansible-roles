@@ -2,6 +2,12 @@
 
 # Configure cmgrd to run as a systemd service.
 
+- name: Ensure challenge directory exists and is root-only
+  ansible.builtin.file:
+    path: "{{ cmgrd_dir }}"
+    state: directory
+    mode: "0770"
+
 - name: Ensure cmgrd systemd unit exists
   ansible.builtin.template:
     src: "cmgrd.service.j2"
