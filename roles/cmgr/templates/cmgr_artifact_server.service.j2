@@ -10,7 +10,7 @@ ConditionDirectoryNotEmpty={{ artifact_server_dir }}
 [Service]
 Type=simple
 WorkingDirectory={{ artifact_server_dir }}
-ExecStart="docker compose up --build -d"
+ExecStart=docker compose up --build -d
 
 [Install]
 WantedBy=multi-user.target
