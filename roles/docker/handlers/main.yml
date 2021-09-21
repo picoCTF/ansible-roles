@@ -1,4 +1,13 @@
 ---
+- name: Update GRUB
+  ansible.builtin.command:
+    cmd: update-grub
+  become: yes
+
+- name: Reboot
+  ansible.builtin.reboot:
+  become: yes
+
 - name: Reload systemd config
   systemd:
     daemon_reload: yes
@@ -8,13 +17,4 @@
   ansible.builtin.service:
     name: docker
     state: restarted
-  become: yes
-
-- name: Update GRUB
-  ansible.builtin.command:
-    cmd: update-grub
-  become: yes
-
-- name: Reboot
-  ansible.builtin.reboot:
   become: yes
