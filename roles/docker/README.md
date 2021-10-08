@@ -119,7 +119,7 @@ remapping is toggled on or off.
 | Name | Description | Default |
 | --- | --- | --- |
 | `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. | `true` |
-| `storage_name` | The block device to format and mount as an XFS filesystem. | `/dev/nvme1n1` |
+| `storage_device` | The block device to format and mount as an XFS filesystem. | `/dev/nvme1n1` |
 
 ### Docker network settings
 
