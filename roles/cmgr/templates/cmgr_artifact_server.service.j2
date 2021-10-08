@@ -1,16 +1,13 @@
 [Unit]
 Description=cmgr artifact server
 Documentation=https://github.com/picoCTF/cmgr-artifact-server
-Wants=docker.service
-Wants=cmgrd.service
-After=docker.service
 ConditionArchitecture=x86-64
-ConditionDirectoryNotEmpty={{ artifact_server_dir }}
+ConditionPathIsDirectory={{ cmgrd_artifact_dir }}
 
 [Service]
-Type=simple
-WorkingDirectory={{ artifact_server_dir }}
-ExecStart=docker compose up --build -d
+Type=exec
+Environment="CMGR_ARTIFACT_DIR={{ cmgrd_artifact_dir }}"
+ExecStart={{ install_location }}/cmgr-artifact-server -b {{ artifact_server_backend }} {{ artifact_server_other_options }}
 
 [Install]
 WantedBy=multi-user.target

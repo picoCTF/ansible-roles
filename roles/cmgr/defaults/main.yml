@@ -13,3 +13,9 @@ cmgrd_interface: "0.0.0.0"
 cmgrd_registry: null
 cmgrd_registry_user: null
 cmgrd_registry_token: null
+
+artifact_server_version: "latest"
+artifact_server_upgrade: no
+artifact_server_service_enabled: yes
+artifact_server_backend: "selfhosted"
+artifact_server_other_options: ""

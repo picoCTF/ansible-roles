@@ -1,0 +1,59 @@
+---
+
+# Install cmgr-artifact-server
+
+- name: Check whether cmgr-artifact-server is installed
+  ansible.builtin.stat:
+    path: "{{ install_location }}/cmgr-artifact-server"
+  register: artifact_server_binary
+
+- name: Determine installed cmgr-artifact-server version
+  ansible.builtin.command:
+    cmd: echo v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
+  when: artifact_server_upgrade and artifact_server_binary.stat.exists
+  register: artifact_server_version_output
+
+- name: Determine latest cmgr-artifact-server version
+  ansible.builtin.uri:
+    url: "{{ artifact_server_github_url }}/releases/latest"
+    method: HEAD
+    follow_redirects: safe
+  register: artifact_server_latest_version_response
+  when: artifact_server_version == "latest" and (not artifact_server_binary.stat.exists or artifact_server_upgrade)
+
+- name: Determine whether (re-)installation is necessary
+  ansible.builtin.set_fact:
+    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or (artifact_server_upgrade and artifact_server_version != 'latest' and artifact_server_version_output.stdout != artifact_server_version) or (artifact_server_upgrade and artifact_server_version == 'latest' and artifact_server_version_output.stdout != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
+
+- name: Create temporary directory for downloads
+  ansible.builtin.tempfile:
+    state: directory
+  register: artifact_server_download_dir
+  when: artifact_server_installation_required
+
+- name: Download cmgr-artifact-server binary
+  ansible.builtin.get_url:
+    dest: "{{ artifact_server_download_dir.path }}"
+    url: "{{ artifact_server_github_url }}/releases/download/{{ artifact_server_latest_version_response.url.split('/tag/')[1] if artifact_server_version == 'latest' else artifact_server_version }}/{{ artifact_server_binary_filename }}"
+  when: artifact_server_installation_required
+
+- name: Unpack cmgr-artifact-server binary
+  ansible.builtin.unarchive:
+    dest: "{{ artifact_server_download_dir.path }}"
+    remote_src: yes
+    src: "{{ artifact_server_download_dir.path }}/{{ artifact_server_binary_filename }}"
+  when: artifact_server_installation_required
+
+- name: Copy cmgr-artifact-server binary to install location
+  ansible.builtin.copy:
+    src: "{{ artifact_server_download_dir.path }}/cmgr-artifact-server"
+    dest: "{{ install_location }}"
+    mode: "0755"
+    remote_src: yes
+  when: artifact_server_installation_required
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ artifact_server_download_dir.path }}"
+    state: absent
+  when: artifact_server_installation_required

@@ -11,11 +11,15 @@ daemon](https://docs.docker.com/get-started/overview/#the-docker-daemon). We hig
 the provided [docker role](../docker/README.md) to configure Docker Engine, as it optimizes the
 daemon settings for use with challenge managers like cmgr.
 
-`cmgr` and `cmgrd` will be installed to `/usr/bin` and should be available on the default `PATH`.
+`cmgr` and `cmgrd` will be installed to `/usr/local/bin` and should be available on the default
+`PATH`.
 
 If enabled, a systemd unit `cmgrd.service` will be added which automatically runs `cmgrd` using the
 specified configuration. The `cmgrd` API is exposed over HTTP on port 4200 and does not support
 authentication. It is your responsibility to restrict access to this port.
+
+[cmgr-artifact-server](https://github.com/picoCTF/cmgr-artifact-server) can also be configured as a
+systemd service to automatically handle the distribution of build artifacts.
 
 ## Role Variables
 
@@ -24,7 +28,7 @@ authentication. It is your responsibility to restrict access to this port.
 | Name | Description | Default |
 | --- | --- | --- |
 | version | cmgr release version to install (e.g. `vX.Y.Z`). Can also be set to `latest` to automatically find the newest version. | `latest` |
-| upgrade | Whether to upgrade an existing cmgr installation. Note that cmgr version upgrades may include breaking changes. Always check the cmgr release notes before enabling this option. | `false` |
+| upgrade | Whether to upgrade an existing cmgr installation. Note that version upgrades may include breaking changes. Always check the release notes before enabling this option. | `false` |
 | download_example_challenges | Whether to download the provided example challenges when installing cmgr. | `false`
 | example_challenge_dir | Destination directory for downloaded example challenges. Will be deleted and recreated upon (re)installation. | `/challenges/examples/`
 
@@ -47,15 +51,14 @@ the default configuration, simply invoking `cmgr` from the `/challenges` directo
 | cmgrd_registry_user | Username to use when authenticating with `cmgrd_registry` | unset |
 | cmgrd_registry_token | Password/token to use when authenticating with `cmgrd_registry` | unset |
 
-### Artifact server configuration (alpha)
+### Artifact server configuration
 
-[cmgr-artifact-server](https://github.com/picoCTF/cmgr-artifact-server) can optionally be configured
-in order to provide access to artifacts without exposing the entire cmgrd API. The artifact server
-will be accessible on port `4201` if enabled.
-
-The functionality and installation method of cmgr-artifact-server is expected to change in Q1 2022,
-so this feature is considered alpha-level and should be used only for testing.
+The `cmgrd_artifact_dir` variable defined above is also used for the artifact server.
 
 | Name | Description | Default |
 | --- | --- | --- |
-| artifact_server_enabled | Whether to enable the artifact proxy server. | `false` |
+| artifact_server_version | cmgr-artifact-server release version to install (e.g. `vX.Y.Z`). Can also be set to `latest` to automatically find the newest version. | `latest` |
+| artifact_server_upgrade | Whether to upgrade an existing cmgr-artifact-server installation. Note that version upgrades may include breaking changes. Always check the release notes before enabling this option. | `false` |
+| artifact_server_service_enabled | Whether to automatically run `cmgr-artifact-server` as a systemd service. | `true` |
+| artifact_server_backend | Artifact server backend to use. | `selfhosted` |
+| artifact_server_other_options | Additional command-line options to pass to `cmgr-artifact-server`, e.g. `--backend-opt some=value --log-level debug`. | unset |
