@@ -44,10 +44,10 @@
     src: "{{ download_dir.path }}/{{ cmgr_binaries_filename }}"
   when: installation_required
 
-- name: Copy cmgr binaries to /usr/bin
+- name: Copy cmgr binaries to install location
   ansible.builtin.copy:
     src: "{{ item }}"
-    dest: /usr/bin
+    dest: "{{ install_location }}"
     mode: "0755"
     remote_src: yes
   with_items:

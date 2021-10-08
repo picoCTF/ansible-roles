@@ -1,6 +1,6 @@
 ---
 challenge_dir: "/challenges"
-install_location: "/usr/bin"
+install_location: "/usr/local/bin"
 cmgr_github_url: "https://github.com/ArmyCyberInstitute/cmgr"
 cmgr_binaries_filename: "cmgr_linux_amd64.tar.gz"
 cmgr_examples_filename: "examples.tar.gz"
