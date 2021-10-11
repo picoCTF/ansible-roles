@@ -1,0 +1,2 @@
+---
+journald_max_size: "500M"

@@ -1,0 +1,17 @@
+---
+
+- name: Limit journald persistent storage size
+  ansible.builtin.lineinfile:
+    path: "{{ journald_dropin_path }}"
+    create: yes
+    search_string: "SystemMaxUse="
+    line: "SystemMaxUse={{ journald_max_size }}"
+  notify: Restart journald
+
+- name: Limit journald volatile storage size
+  ansible.builtin.lineinfile:
+    path: "{{ journald_dropin_path }}"
+    create: yes
+    search_string: "RuntimeMaxUse="
+    line: "RuntimeMaxUse={{ journald_max_size }}"
+  notify: Restart journald
