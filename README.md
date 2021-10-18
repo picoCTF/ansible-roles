@@ -18,6 +18,7 @@ though they may work on other platforms with minor changes.
 | [atop](./roles/atop/README.md) | Configures atop to regularly log process metrics. |
 | [docker](./roles/docker/README.md) | Configures Docker Engine with ideal settings for platform components. |
 | [cmgr](./roles/cmgr/README.md) | Installs cmgr and optionally configures a cmgrd server. |
+| [actions_runner](./roles/actions-runner/README.md) | Installs the self-hosted GitHub Actions runner. |
 
 ## Quick Start
 
@@ -66,3 +67,28 @@ though they may work on other platforms with minor changes.
 
     Also note that the specified SSH user must be able to elevate to root [using
     `become`](https://docs.ansible.com/ansible/latest/user_guide/become.html).
+
+## Development
+
+A Vagrantfile is included to create a sample VM for testing roles.
+
+1. Create the VM: `vagrant up`
+1. Create a playbook:
+
+    ```yaml
+    # example-playbook.yml
+    - hosts: all
+      tasks:
+        - include_role:
+            name: picoctf.ansible_roles.os
+        - include_role:
+            name: picoctf.ansible_roles.docker
+          vars:
+            tls_access: no
+            storage_device: /dev/sdc
+        - include_role:
+            name: picoctf.ansible_roles.cmgr
+    ```
+
+1. Reinstall the collection locally and run the playbook against the VM: `ansible-galaxy collection install -f .; ansible-playbook -i 127.0.0.1:2222, --private-key=.vagrant/machines/default/virtualbox/private_key -u=vagrant example-playbook.yml`
+1. If necessary, SSH into the VM to see the results: `vagrant ssh`
