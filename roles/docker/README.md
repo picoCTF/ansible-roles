@@ -94,6 +94,12 @@ While not recommended, this functionality can be [disabled](#user-namespace-sett
 Note that any existing image layers and Docker volumes will become inaccessible when user namespace
 remapping is toggled on or off.
 
+### OCI runtime
+
+By default, the [OCI interceptor](https://github.com/picoCTF/oci-interceptor) runtime wrapper is
+used along with runc. This can be used to work around limitations in Docker's native
+resource-limiting capabilities.
+
 ## Role Variables
 
 ### General settings
@@ -101,7 +107,7 @@ remapping is toggled on or off.
 | Name | Description | Default |
 | --- | --- | --- |
 | `docker_group_users` | Adds these users to the `docker` group, granting them access to the daemon without `sudo`. | `[]` |
-| `upgrade` | Whether to upgrade packages if already installed | `false` |
+| `upgrade` | Whether to upgrade Docker packages if already installed | `false` |
 
 ### TLS Docker socket access settings
 
@@ -133,3 +139,12 @@ remapping is toggled on or off.
 | Name | Description | Default |
 | --- | --- | --- |
 | `userns_remap_enabled` | Whether to enable user namespace remapping. | `true` |
+
+### OCI runtime settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `oci_interceptor_enabled` | Whether to use the `oci-interceptor` runtime wrapper. | `true` |
+| `oci_interceptor_version` | Version of `oci-interceptor` to install. | `latest` |
+| `oci_interceptor_upgrade` | Whether to upgrade `oci-interceptor` if already installed. | `false` |
+| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. | `[]` |

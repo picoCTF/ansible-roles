@@ -1,0 +1,59 @@
+---
+
+# Installs oci-interceptor
+
+- name: Check whether oci-interceptor is installed
+  ansible.builtin.stat:
+    path: "{{ oci_interceptor_install_path }}/oci-interceptor"
+  register: oci_interceptor_binary
+
+- name: Determine installed oci-interceptor version
+  ansible.builtin.command:
+    cmd: echo v`{{ oci_interceptor_install_path }}/oci-interceptor -V | cut -d ' ' -f 2,2`"
+  when: oci_interceptor_upgrade and oci_interceptor_binary.stat.exists
+  register: oci_interceptor_version_output
+
+- name: Determine latest oci-interceptor version
+  ansible.builtin.uri:
+    url: "{{ oci_interceptor_github_url }}/releases/latest"
+    method: HEAD
+    follow_redirects: safe
+  register: oci_interceptor_latest_version_response
+  when: oci_interceptor_version == "latest" and (not oci_interceptor_binary.stat.exists or oci_interceptor_upgrade)
+
+- name: Determine whether (re-)installation is necessary
+  ansible.builtin.set_fact:
+    oci_interceptor_installation_required: "{{ (not oci_interceptor_binary.stat.exists) or (oci_interceptor_upgrade and oci_interceptor_version != 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_version) or (oci_interceptor_upgrade and oci_interceptor_version == 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_latest_version_response.url.split('/tag/')[1]) }}"
+
+- name: Create temporary directory for download
+  ansible.builtin.tempfile:
+    state: directory
+  register: oci_interceptor_download_dir
+  when: oci_interceptor_installation_required
+
+- name: Download oci-interceptor binary
+  ansible.builtin.get_url:
+    dest: "{{ oci_interceptor_download_dir.path }}"
+    url: "{{ oci_interceptor_github_url }}/releases/download/{{ oci_interceptor_latest_version_response.url.split('/tag/')[1] if oci_interceptor_version == 'latest' else oci_interceptor_version }}/{{ oci_interceptor_binary_filename }}"
+  when: oci_interceptor_installation_required
+
+- name: Unpack oci-interceptor binary
+  ansible.builtin.unarchive:
+    dest: "{{ oci_interceptor_download_dir.path }}"
+    remote_src: yes
+    src: "{{ oci_interceptor_download_dir.path }}/{{ oci_interceptor_binary_filename }}"
+  when: oci_interceptor_installation_required
+
+- name: Copy oci-interceptor binary to install location
+  ansible.builtin.copy:
+    src: "{{ oci_interceptor_download_dir.path }}/oci-interceptor"
+    dest: "{{ oci_interceptor_install_path }}"
+    mode: "0755"
+    remote_src: yes
+  when: oci_interceptor_installation_required
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ oci_interceptor_download_dir.path }}"
+    state: absent
+  when: oci_interceptor_installation_required

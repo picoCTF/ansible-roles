@@ -25,5 +25,15 @@
     "userns-remap": "default",
     {% endif %}
 
+    {% if oci_interceptor_enabled %}
+    "default-runtime": "oci-interceptor",
+    "runtimes": {
+        "oci-interceptor": {
+            "path": "{{ oci_interceptor_install_path }}/oci-interceptor",
+            "runtimeArgs": {{ oci_interceptor_flags | to_json }}
+        }
+    },
+    {% endif %}
+
     "containerd": "/run/containerd/containerd.sock"
 }

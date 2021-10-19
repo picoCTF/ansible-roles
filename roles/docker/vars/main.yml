@@ -19,3 +19,7 @@ storage_mount_point: "/mnt/docker-data"
 grub_cloudimg_config_path: "/etc/default/grub.d/50-cloudimg-settings.cfg"
 parent_cgroup: "limit_docker.slice"
 parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
+
+oci_interceptor_install_path: "/usr/local/bin"
+oci_interceptor_github_url: "https://github.com/picoCTF/oci-interceptor"
+oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.gz"

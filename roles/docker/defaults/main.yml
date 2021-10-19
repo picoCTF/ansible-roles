@@ -16,3 +16,8 @@ network_ip_pools: ["172.17.0.0/12", "192.168.0.0/16"]
 network_prefix_length: 29
 
 userns_remap_enabled: yes
+
+oci_interceptor_enabled: yes
+oci_interceptor_version: "latest"
+oci_interceptor_upgrade: no
+oci_interceptor_flags: []
