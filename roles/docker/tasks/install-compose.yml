@@ -11,11 +11,11 @@
 
 - name: Ensure Docker CLI plugins directory exists
   ansible.builtin.file:
-    path: "/root/.docker/cli-plugins"
+    path: "/usr/local/lib/docker/cli-plugins"
     state: directory
 
 - name: Ensure Compose V2 CLI plugin is installed
   ansible.builtin.get_url:
-    dest: "/root/.docker/cli-plugins/docker-compose"
+    dest: "/usr/local/lib/docker/cli-plugins/docker-compose"
     url: "https://github.com/docker/compose/releases/download/v2.0.1/docker-compose-linux-x86_64"
     mode: "0755"
