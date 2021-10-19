@@ -1,0 +1,54 @@
+---
+
+- name: Check if configuration file exists
+  ansible.builtin.stat:
+    path: "{{ runner_dir }}/config.json"
+  register: config_file
+
+- name: Read contents of config file
+  ansible.builtin.slurp:
+    src: "{{ runner_dir }}/config.json"
+  register: config_contents
+  when: config_file.stat.exists
+
+- name: Determine whether to (re)configure runner
+  ansible.builtin.set_fact:
+    configuration_required: "{{ not config_file.stat.exists or (config_contents.content | b64decode | from_json).repo_url != repo_url or (config_contents.content | b64decode | from_json).token != token }}"
+
+- name: Uninstall old service
+  ansible.builtin.shell:
+    chdir: "{{ runner_dir }}"
+    cmd: "./svc.sh uninstall"
+  when: configuration_required and config_file.stat.exists
+
+- name: Remove old configuration
+  ansible.builtin.shell:
+    chdir: "{{ runner_dir }}"
+    cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh remove --token {{ (config_contents.content | b64decode | from_json).token }}"
+  when: configuration_required and config_file.stat.exists
+
+- name: Write new config file
+  ansible.builtin.template:
+    src: "config.json.j2"
+    dest: "{{ runner_dir }}/config.json"
+    lstrip_blocks: yes
+    force: yes
+  when: configuration_required
+
+- name: Configure runner
+  ansible.builtin.shell:
+    chdir: "{{ runner_dir }}"
+    cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh --unattended --url {{ repo_url }} --token {{ token }}"
+  when: configuration_required
+
+- name: Install runner service
+  ansible.builtin.shell:
+    chdir: "{{ runner_dir }}"
+    cmd: "./svc.sh install root"
+  when: configuration_required
+
+- name: Start runner service
+  ansible.builtin.shell:
+    chdir: "{{ runner_dir }}"
+    cmd: "./svc.sh start"
+  when: configuration_required

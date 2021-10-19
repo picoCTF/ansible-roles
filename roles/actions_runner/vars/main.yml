@@ -1,0 +1,4 @@
+---
+
+runner_dir: /usr/local/actions-runner
+runner_github_url: https://github.com/actions/runner

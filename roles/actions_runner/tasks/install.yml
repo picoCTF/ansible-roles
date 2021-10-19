@@ -1,0 +1,44 @@
+---
+
+- name: Check whether runner is installed
+  ansible.builtin.stat:
+    path: "{{ runner_dir }}/run.sh"
+  register: run_script
+
+- name: Determine whether (re-)installation is necessary
+  ansible.builtin.set_fact:
+    installation_required: "{{ not run_script.stat.exists }}"
+
+- name: Ensure runner directory exists
+  ansible.builtin.file:
+    path: "{{ runner_dir }}"
+    state: directory
+  when: installation_required
+
+- name: Determine latest runner version
+  ansible.builtin.uri:
+    url: "{{ runner_github_url }}/releases/latest"
+    method: HEAD
+    follow_redirects: safe
+  register: latest_version_response
+  when: installation_required
+
+- name: Download runner files
+  ansible.builtin.get_url:
+    dest: "{{ runner_dir }}/runner.tar.gz"
+    url: "{{ runner_github_url }}/releases/download/{{ latest_version_response.url.split('/tag/')[1] }}/actions-runner-linux-x64-{{ latest_version_response.url.split('/tag/')[1][1:] }}.tar.gz"
+  when: installation_required
+
+- name: Extract runner files
+  ansible.builtin.unarchive:
+    src: "{{ runner_dir }}/runner.tar.gz"
+    remote_src: yes
+    dest: "{{ runner_dir }}"
+  when: installation_required
+
+- name: Delete tarball
+  ansible.builtin.file:
+    path: "{{ runner_dir }}/runner.tar.gz"
+    state: absent
+  when: installation_required
+

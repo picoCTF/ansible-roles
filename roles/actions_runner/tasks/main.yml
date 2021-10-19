@@ -1,0 +1,3 @@
+---
+- { include: install.yml, become: yes }
+- { include: configure.yml, become: yes }
