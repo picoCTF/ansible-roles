@@ -1,14 +1,17 @@
 # picoCTF Ansible Roles
 
 An [Ansible collection](https://docs.ansible.com/ansible/latest/user_guide/collections_using.html)
-containing various roles for configuring platform components and compatible challenge server
-backends. All included roles are designed to be idempotent (i.e. repeatedly applicable without side
-effects) when the configured variables are unchanged. However, some roles do define variables which
-may cause non-idempotent behavior (upgrading packages, regenerating certificates, etc.) if set to
-non-default values. Check each role's README file for a full description of configurable variables.
+containing various roles for configuring picoCTF platform components and challenge server backends.
 
-Note that as of this writing, all roles have only been tested on amd64 Ubuntu 20.04 LTS hosts,
-though they may work on other platforms with minor changes.
+In most cases, all included roles are designed to be idempotent when re-run with the same
+configuration.
+
+However, some roles include variables which can cause non-idempotent behavior (upgrading packages,
+regenerating certificates, etc.) if set to non-default values. Check each role's README file for a
+full description of configurable variables.
+
+Note that as of this writing, all roles have only been tested on x86_64 Ubuntu 20.04 LTS hosts,
+though they may be portable to other platforms with minor changes.
 
 ## Included Roles
 
@@ -31,7 +34,7 @@ though they may work on other platforms with minor changes.
 1. Write a [playbook](https://docs.ansible.com/ansible/latest/user_guide/index.html#writing-tasks-plays-and-playbooks) mapping desired roles to your hosts, e.g.:
 
     ```yaml
-    # sample_playbook.yml
+    # example_playbook.yml
     ---
     - hosts: all  # or a group from your Ansible inventory
       tasks:
@@ -44,13 +47,13 @@ though they may work on other platforms with minor changes.
     Note that all roles in this collection already specify `become: yes` to elevate to root as
     necessary, so you do not need to handle that in your playbook.
 
-    In our example playbook, we use `include_role` tasks rather than a top-level `roles:` section so
-    that variables are by default scoped to roles rather than the entire play.
+    We recommend using `include_role` tasks rather than a top-level `roles:` section so that
+    variables can be scoped to roles rather than the entire play.
 
 1. Run the playbook:
 
     ```shell
-    $ ansible-playbook sample_playbook.yml
+    $ ansible-playbook example_playbook.yml
     ```
 
     If you don't want to define an [inventory
