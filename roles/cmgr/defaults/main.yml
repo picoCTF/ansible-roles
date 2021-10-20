@@ -13,6 +13,7 @@ cmgrd_interface: "0.0.0.0"
 cmgrd_registry: null
 cmgrd_registry_user: null
 cmgrd_registry_token: null
+cmgrd_extra_environment_vars: {}
 
 artifact_server_version: "latest"
 artifact_server_upgrade: no

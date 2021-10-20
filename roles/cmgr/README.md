@@ -50,6 +50,7 @@ the default configuration, simply invoking `cmgr` from the `/challenges` directo
 | cmgrd_registry | Docker registry for frozen challenges | unset |
 | cmgrd_registry_user | Username to use when authenticating with `cmgrd_registry` | unset |
 | cmgrd_registry_token | Password/token to use when authenticating with `cmgrd_registry` | unset |
+| cmgrd_extra_environment_vars | Extra environment variables to set for the cmgrd service. | `{}` |
 
 ### Artifact server configuration
 

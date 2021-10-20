@@ -22,6 +22,9 @@ Environment="CMGR_REGISTRY_USER={{ cmgrd_registry_user }}"
 {% if cmgrd_registry_token %}
 Environment="CMGR_REGISTRY_TOKEN={{ cmgrd_registry_token }}"
 {% endif %}
+{% for key, value in cmgrd_extra_environment_vars.items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
 ExecStart={{ install_location }}/cmgrd
 
 [Install]
