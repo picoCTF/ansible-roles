@@ -13,7 +13,7 @@
 
 - name: Determine whether to (re)configure runner
   ansible.builtin.set_fact:
-    configuration_required: "{{ not config_file.stat.exists or (config_contents.content | b64decode | from_json).repo_url != repo_url or (config_contents.content | b64decode | from_json).token != token }}"
+    configuration_required: "{{ not config_file.stat.exists or (config_contents.content | b64decode | from_json).repo_url != repo_url or (config_contents.content | b64decode | from_json).token != token or (config_contents.content | b64decode | from_json).extra_config_options != extra_config_options }}"
 
 - name: Uninstall old service
   ansible.builtin.shell:
@@ -38,7 +38,7 @@
 - name: Configure runner
   ansible.builtin.shell:
     chdir: "{{ runner_dir }}"
-    cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh --unattended --url {{ repo_url }} --token {{ token }}"
+    cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh --unattended --url {{ repo_url }} --token {{ token }} {{ extra_config_options }}"
   when: configuration_required
 
 - name: Install runner service
