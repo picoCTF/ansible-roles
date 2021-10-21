@@ -7,3 +7,9 @@
 - { include: parent-cgroup.yml, become: yes }
 - { include: oci-interceptor.yml, become: yes, when: oci_interceptor_enabled }
 - { include: config.yml, become: yes }
+- ansible.builtin.meta: flush_handlers
+- name: Ensure Docker service is started
+  ansible.builtin.service:
+    name: docker
+    state: started
+  become: yes

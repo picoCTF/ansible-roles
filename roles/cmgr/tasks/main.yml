@@ -3,3 +3,16 @@
 - { include: service.yml, become: yes, when: cmgrd_service_enabled }
 - { include: artifact-server-install.yml, become: yes }
 - { include: artifact-server-service.yml, become: yes, when: artifact_server_service_enabled }
+- ansible.builtin.meta: flush_handlers
+- name: Ensure cmgrd service is started
+  ansible.builtin.service:
+    name: cmgrd
+    state: started
+  become: yes
+  when: cmgrd_service_enabled
+- name: Ensure cmgr-artifact-server service is started
+  ansible.builtin.service:
+    name: cmgr_artifact_server
+    state: started
+  become: yes
+  when: artifact_server_service_enabled
