@@ -21,7 +21,7 @@ though they may be portable to other platforms with minor changes.
 | [atop](./roles/atop/README.md) | Configures atop to regularly log process metrics. |
 | [docker](./roles/docker/README.md) | Configures Docker Engine with ideal settings for platform components. |
 | [cmgr](./roles/cmgr/README.md) | Installs cmgr and optionally configures a cmgrd server. |
-| [actions_runner](./roles/actions-runner/README.md) | Installs the self-hosted GitHub Actions runner. |
+| [actions_runner](./roles/actions_runner/README.md) | Installs the self-hosted GitHub Actions runner. |
 
 ## Quick Start
 
