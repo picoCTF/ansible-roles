@@ -20,3 +20,4 @@ artifact_server_upgrade: no
 artifact_server_service_enabled: yes
 artifact_server_backend: "selfhosted"
 artifact_server_other_options: ""
+artifact_server_extra_environment_vars: {}

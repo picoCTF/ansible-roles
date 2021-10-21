@@ -7,6 +7,9 @@ ConditionPathIsDirectory={{ cmgrd_artifact_dir }}
 [Service]
 Type=exec
 Environment="CMGR_ARTIFACT_DIR={{ cmgrd_artifact_dir }}"
+{% for key, value in artifact_server_extra_environment_vars.items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
 ExecStart={{ install_location }}/cmgr-artifact-server -b {{ artifact_server_backend }} {{ artifact_server_other_options }}
 
 [Install]
