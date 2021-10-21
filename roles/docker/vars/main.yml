@@ -6,12 +6,12 @@ ca_csr_path: "{{ tls_cert_path }}/ca.csr"
 ca_cert_path: "{{ tls_cert_path }}/ca.pem"
 
 server_key_path: "{{ tls_cert_path }}/server-key.pem"
-server_csr_path: "{{ tls_cert_path }}/server.csr"
-server_cert_path: "{{ tls_cert_path }}/server.pem"
+server_csr_path: "{{ tls_cert_path }}/server-cert.csr"
+server_cert_path: "{{ tls_cert_path }}/server-cert.pem"
 
-client_key_path: "{{ tls_cert_path }}/client-key.pem"
-client_csr_path: "{{ tls_cert_path }}/client.csr"
-client_cert_path: "{{ tls_cert_path }}/client.pem"
+client_key_path: "{{ tls_cert_path }}/key.pem"
+client_csr_path: "{{ tls_cert_path }}/cert.csr"
+client_cert_path: "{{ tls_cert_path }}/cert.pem"
 
 systemd_drop_in_dir: "/etc/systemd/system/docker.service.d"
 
