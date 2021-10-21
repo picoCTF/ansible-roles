@@ -63,3 +63,4 @@ The `cmgrd_artifact_dir` variable defined above is also used for the artifact se
 | artifact_server_service_enabled | Whether to automatically run `cmgr-artifact-server` as a systemd service. | `true` |
 | artifact_server_backend | Artifact server backend to use. | `selfhosted` |
 | artifact_server_other_options | Additional command-line options to pass to `cmgr-artifact-server`, e.g. `--backend-opt some=value --log-level debug`. | unset |
+| artifact_server_extra_environment_vars | Extra environment variables to set for the cmgrd-artifact-server service. | `{}` |
