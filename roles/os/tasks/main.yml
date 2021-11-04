@@ -1,2 +1,3 @@
 ---
 - { include: journald.yml, become: yes }
+- { include: sysctls.yml, become: yes }

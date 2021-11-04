@@ -1,0 +1,10 @@
+---
+
+- name: Set ephemeral port range
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_local_port_range
+    value: "{{ ephemeral_port_range.split('-')[0].strip() }} {{ ephemeral_port_range.split('-')[1].strip() }}"
+    state: present
+    sysctl_set: yes
+  when: ephemeral_port_range
+  notify: Reboot
