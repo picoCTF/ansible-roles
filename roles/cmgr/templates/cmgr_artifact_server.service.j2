@@ -2,11 +2,11 @@
 Description=cmgr artifact server
 Documentation=https://github.com/picoCTF/cmgr-artifact-server
 ConditionArchitecture=x86-64
-ConditionPathIsDirectory={{ cmgrd_artifact_dir }}
+ConditionPathIsDirectory={{ cmgr_artifact_dir }}
 
 [Service]
 Type=exec
-Environment="CMGR_ARTIFACT_DIR={{ cmgrd_artifact_dir }}"
+Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}"
 {% for key, value in artifact_server_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"
 {% endfor %}

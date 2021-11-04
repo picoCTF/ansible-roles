@@ -4,7 +4,7 @@
 
 - name: Ensure artifact directory exists and is root-only
   ansible.builtin.file:
-    path: "{{ cmgrd_artifact_dir }}"
+    path: "{{ cmgr_artifact_dir }}"
     state: directory
     mode: "0770"
 

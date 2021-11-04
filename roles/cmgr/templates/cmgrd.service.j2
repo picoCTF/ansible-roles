@@ -4,25 +4,25 @@ Documentation=https://github.com/ArmyCyberInstitute/cmgr
 Wants=docker.service
 After=docker.service
 ConditionArchitecture=x86-64
-ConditionPathIsDirectory={{ cmgrd_dir }}
+ConditionPathIsDirectory={{ cmgr_dir }}
 
 [Service]
 Type=exec
-Environment="CMGR_DB={{ cmgrd_db }}"
-Environment="CMGR_DIR={{ cmgrd_dir }}"
-Environment="CMGR_ARTIFACT_DIR={{ cmgrd_artifact_dir }}"
-Environment="CMGR_LOGGING={{ cmgrd_logging }}"
-Environment="CMGR_INTERFACE={{ cmgrd_interface }}"
-{% if cmgrd_registry %}
-Environment="CMGR_REGISTRY={{ cmgrd_registry }}"
+Environment="CMGR_DB={{ cmgr_db }}"
+Environment="CMGR_DIR={{ cmgr_dir }}"
+Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}"
+Environment="CMGR_LOGGING={{ cmgr_logging }}"
+Environment="CMGR_INTERFACE={{ cmgr_interface }}"
+{% if cmgr_registry %}
+Environment="CMGR_REGISTRY={{ cmgr_registry }}"
 {% endif %}
-{% if cmgrd_registry_user %}
-Environment="CMGR_REGISTRY_USER={{ cmgrd_registry_user }}"
+{% if cmgr_registry_user %}
+Environment="CMGR_REGISTRY_USER={{ cmgr_registry_user }}"
 {% endif %}
-{% if cmgrd_registry_token %}
-Environment="CMGR_REGISTRY_TOKEN={{ cmgrd_registry_token }}"
+{% if cmgr_registry_token %}
+Environment="CMGR_REGISTRY_TOKEN={{ cmgr_registry_token }}"
 {% endif %}
-{% for key, value in cmgrd_extra_environment_vars.items() %}
+{% for key, value in cmgr_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"
 {% endfor %}
 ExecStart={{ install_location }}/cmgrd

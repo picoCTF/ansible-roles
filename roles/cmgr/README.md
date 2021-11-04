@@ -42,19 +42,19 @@ the default configuration, simply invoking `cmgr` from the `/challenges` directo
 | Name | Description | Default |
 | --- | --- | --- |
 | cmgrd_service_enabled | Whether to automatically run `cmgrd` as a systemd service. | `true` |
-| cmgrd_db | Path to cmgr database file | `/challenges/cmgr.db` |
-| cmgrd_dir | Directory containing challenges. Will be set to `0770` permissions (root access only) | `/challenges` |
-| cmgrd_artifact_dir | Directory for storing artifact bundles | `/challenges` |
-| cmgrd_logging | Logging verbosity | `warn` |
-| cmgrd_interface | Interface to which published challenge ports are bound | `0.0.0.0` |
-| cmgrd_registry | Docker registry for frozen challenges | unset |
-| cmgrd_registry_user | Username to use when authenticating with `cmgrd_registry` | unset |
-| cmgrd_registry_token | Password/token to use when authenticating with `cmgrd_registry` | unset |
-| cmgrd_extra_environment_vars | Extra environment variables to set for the cmgrd service. | `{}` |
+| cmgr_db | Path to cmgr database file | `/challenges/cmgr.db` |
+| cmgr_dir | Directory containing challenges. Will be set to `0770` permissions (root access only) | `/challenges` |
+| cmgr_artifact_dir | Directory for storing artifact bundles | `/challenges` |
+| cmgr_logging | Logging verbosity | `warn` |
+| cmgr_interface | Interface to which published challenge ports are bound | `0.0.0.0` |
+| cmgr_registry | Docker registry for frozen challenges | unset |
+| cmgr_registry_user | Username to use when authenticating with `cmgr_registry` | unset |
+| cmgr_registry_token | Password/token to use when authenticating with `cmgr_registry` | unset |
+| cmgr_extra_environment_vars | Extra environment variables to set for the cmgrd service. | `{}` |
 
 ### Artifact server configuration
 
-The `cmgrd_artifact_dir` variable defined above is also used for the artifact server.
+The `cmgr_artifact_dir` variable defined above is also used for the artifact server.
 
 | Name | Description | Default |
 | --- | --- | --- |
