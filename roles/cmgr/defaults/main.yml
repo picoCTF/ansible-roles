@@ -3,6 +3,7 @@ version: "latest"
 upgrade: no
 download_example_challenges: no
 example_challenge_dir: "{{ challenge_dir }}/examples"
+wrapper_enabled: yes
 
 cmgrd_service_enabled: yes
 cmgr_db: "{{ challenge_dir }}/cmgr.db"

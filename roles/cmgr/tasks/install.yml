@@ -86,3 +86,17 @@
     path: "{{ download_dir.path }}"
     state: absent
   when: installation_required
+
+- name: Rename cmgr binary
+  ansible.builtin.command:
+    cmd: mv {{ install_location }}/cmgr {{ install_location }}/cmgr_bin
+  when: installation_required and wrapper_enabled
+
+- name: Add environment variable wrapper
+  ansible.builtin.template:
+    src: "cmgr.j2"
+    dest: "{{ install_location }}/cmgr"
+    lstrip_blocks: yes
+    force: yes
+    mode: "0755"
+  when: installation_required and wrapper_enabled
