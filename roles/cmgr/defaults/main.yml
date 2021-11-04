@@ -13,6 +13,7 @@ cmgr_interface: "0.0.0.0"
 cmgr_registry: null
 cmgr_registry_user: null
 cmgr_registry_token: null
+cmgr_ports: null
 cmgr_extra_environment_vars: {}
 
 artifact_server_version: "latest"

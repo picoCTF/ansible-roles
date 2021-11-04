@@ -50,6 +50,7 @@ the default configuration, simply invoking `cmgr` from the `/challenges` directo
 | cmgr_registry | Docker registry for frozen challenges | unset |
 | cmgr_registry_user | Username to use when authenticating with `cmgr_registry` | unset |
 | cmgr_registry_token | Password/token to use when authenticating with `cmgr_registry` | unset |
+| cmgr_ports | Specifc range of ports (e.g. `2000-12000`) to use for hosting challenge containers. Assumes that cmgr(d) has exclusive control of these ports. If unspecified, containers will use random ephemeral ports and will become out-of-sync with the cmgr database if restarted. | unset |
 | cmgr_extra_environment_vars | Extra environment variables to set for the cmgrd service. | `{}` |
 
 ### Artifact server configuration

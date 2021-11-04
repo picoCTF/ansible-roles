@@ -22,6 +22,9 @@ Environment="CMGR_REGISTRY_USER={{ cmgr_registry_user }}"
 {% if cmgr_registry_token %}
 Environment="CMGR_REGISTRY_TOKEN={{ cmgr_registry_token }}"
 {% endif %}
+{% if cmgr_ports %}
+Environment="CMGR_PORTS={{ cmgr_ports }}"
+{% endif %}
 {% for key, value in cmgr_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"
 {% endfor %}
