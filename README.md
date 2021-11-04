@@ -93,5 +93,5 @@ A Vagrantfile is included to create a sample VM for testing roles.
             name: picoctf.ansible_roles.cmgr
     ```
 
-1. Reinstall the collection locally and run the playbook against the VM: `ansible-galaxy collection install -f .; ansible-playbook -i 127.0.0.1:2222, --private-key=.vagrant/machines/default/virtualbox/private_key -u=vagrant example-playbook.yml`
+1. Reinstall the collection locally and run the playbook against the VM: `ansible-galaxy collection install -f .; ansible-playbook -i 127.0.0.1:2222, --private-key=$(vagrant ssh-config 2> /dev/null  | grep IdentityFile | awk '{print $NF}') -u=vagrant example-playbook.yml`
 1. If necessary, SSH into the VM to see the results: `vagrant ssh`
