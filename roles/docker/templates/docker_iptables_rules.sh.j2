@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Applies iptables rules to limit outbound network access from
+# custom Docker bridge networks.
+
+# Automatically invoked by systemd (docker_iptables_rules.service)
+
+iptables-restore --noflush << "EOF"
+*filter
+:DOCKER-USER - [0:0]
+-A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A DOCKER-USER -i docker0 -j RETURN
+-A DOCKER-USER -i br-+ -o br-+ -j RETURN
+{% for allowed_ip in custom_networks_allowed_ips %}
+-A DOCKER-USER -d {{ allowed_ip }} -i br-+ -j RETURN
+{% endfor %}
+-A DOCKER-USER -j REJECT --reject-with icmp-port-unreachable
+COMMIT
+EOF

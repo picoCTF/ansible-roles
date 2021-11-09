@@ -18,3 +18,9 @@
     name: docker
     state: restarted
   become: yes
+
+- name: Restart iptables rules service
+  ansible.builtin.service:
+    name: docker_iptables_rules
+    state: restarted
+  become: yes

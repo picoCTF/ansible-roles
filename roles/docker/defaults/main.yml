@@ -24,3 +24,6 @@ oci_interceptor_flags: []
 
 logs_max_size: "10m"
 logs_max_files: 3
+
+custom_networks_outbound_access_blocked: no
+custom_networks_allowed_ips: []

@@ -118,6 +118,20 @@ amount of log output retained (30m across 3 files) is somewhat reduced from the 
 sufficient for the majority of use cases. The amount of output retained is customizable using the
 variables [listed below](#logging-settings).
 
+### Outbound access for custom Docker networks
+
+Though not enabled by default, a setting is provided which prevents outbound network access from
+containers on custom Docker bridge networks, such as
+[cmgr](https://github.com/ArmyCyberInstitute/cmgr) challenges or
+[webshell](https://github.com/picoCTF/webshell) toolbox containers. This can provide additional
+security by ensuring that players cannot send malicious traffic from challenge servers or webshell
+toolbox hosts.
+
+When enabled, container-to-container connections inside the network and inbound connections via
+published ports are unaffected. In addition, it is possible to specify an allowlist of IPs or CIDRs
+that will remain accessible by containers on custom networks. See
+[below](#custom-network-outbound-access-settings) for a list of configuration variables.
+
 ## Role Variables
 
 ### General settings
@@ -173,3 +187,10 @@ variables [listed below](#logging-settings).
 | --- | --- | --- |
 | `logs_max_size` | Maximum size of an individual container log file. | `10m` |
 | `logs_max_files` | Maximum number of log files to retain per container. If rolling the logs creates excess files, the oldest are deleted. | `3` |
+
+### Custom network outbound access settings
+
+| Name | Configuration | Default |
+| --- | --- | --- |
+| `custom_networks_outbound_access_blocked` | If enabled, external outbound network traffic will be blocked for containers on custom Docker bridge networks. Temporary containers used during `docker build` and containers without a custom network are unaffected. | `false` |
+| `custom_networks_allowed_ips` | A list of IPv4 addresses (or CIDRs) to be allowlisted when `custom_networks_outbound_access_blocked` is enabled. | `[]` |

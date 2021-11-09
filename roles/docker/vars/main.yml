@@ -23,3 +23,6 @@ parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
 oci_interceptor_install_path: "/usr/local/bin"
 oci_interceptor_github_url: "https://github.com/picoCTF/oci-interceptor"
 oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.gz"
+
+iptables_script_path: "/sbin/docker_iptables_rules.sh"
+iptables_service_path: "/etc/systemd/system/docker_iptables_rules.service"

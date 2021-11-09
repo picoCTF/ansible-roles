@@ -6,6 +6,7 @@
 - { include: storage.yml, become: yes, when: storage_quotas }
 - { include: parent-cgroup.yml, become: yes }
 - { include: oci-interceptor.yml, become: yes, when: oci_interceptor_enabled }
+- { include: iptables.yml, become: yes, when: custom_networks_outbound_access_blocked }
 - { include: config.yml, become: yes }
 - ansible.builtin.meta: flush_handlers
 - name: Ensure Docker service is active
@@ -15,3 +16,9 @@
   become: yes
   register: docker_service
   until: docker_service.status.ActiveState == "active"
+- name: Ensure iptables rules service is active
+  ansible.builtin.service:
+    name: docker_iptables_rules
+    state: started
+  become: yes
+  when: custom_networks_outbound_access_blocked
