@@ -21,3 +21,6 @@ oci_interceptor_enabled: yes
 oci_interceptor_version: "latest"
 oci_interceptor_upgrade: no
 oci_interceptor_flags: []
+
+logs_max_file_size: "10m"
+logs_max_files: 3

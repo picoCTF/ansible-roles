@@ -35,5 +35,11 @@
     },
     {% endif %}
 
+    "log-driver": "local",
+    "log-opts": {
+        "max-size": "{{ logs_max_size }}",
+        "max-file": "{{ logs_max_files }}"
+    },
+
     "containerd": "/run/containerd/containerd.sock"
 }

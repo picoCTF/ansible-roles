@@ -100,6 +100,24 @@ By default, the [OCI interceptor](https://github.com/picoCTF/oci-interceptor) ru
 used along with runc. This can be used to work around limitations in Docker's native
 resource-limiting capabilities.
 
+### Log driver
+
+As
+[recommended](https://docs.docker.com/config/containers/logging/configure/#supported-logging-drivers)
+in the Docker documentation, the daemon is configured to use the `local` log driver. Unlike the
+default `json-file` driver, this driver places a cap on the maximum size of log files stored per
+container.
+
+This is important for interactive containers, as otherwise malicious users can easily exhaust the
+Docker graph storage volume by generating excessive logs.
+
+We've chosen to retain a fixed amount of logs per container rather than disabling logging entirely,
+as it is often useful to examine the logs of challenge containers in order to diagnose problems. The
+amount of log output retained (30m across 3 files) is somewhat reduced from the `local` driver's
+[defaults](https://docs.docker.com/config/containers/logging/local/#options) but should still be
+sufficient for the majority of use cases. The amount of output retained is customizable using the
+variables [listed below](#logging-settings).
+
 ## Role Variables
 
 ### General settings
@@ -148,3 +166,10 @@ resource-limiting capabilities.
 | `oci_interceptor_version` | Version of `oci-interceptor` to install. | `latest` |
 | `oci_interceptor_upgrade` | Whether to upgrade `oci-interceptor` if already installed. | `false` |
 | `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. | `[]` |
+
+### Logging settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `logs_max_size` | Maximum size of an individual container log file. | `10m` |
+| `logs_max_files` | Maximum number of log files to retain per container. If rolling the logs creates excess files, the oldest are deleted. | `3` |
