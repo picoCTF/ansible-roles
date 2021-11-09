@@ -26,3 +26,9 @@
   notify:
     - Reload systemd config
     - Restart iptables rules service
+
+- name: Ensure systemd unit is enabled
+  ansible.builtin.systemd:
+    name: docker_iptables_rules.service
+    daemon_reload: yes
+    enabled: yes

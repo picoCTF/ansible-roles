@@ -18,6 +18,12 @@
   notify:
     - Reload systemd config
 
+- name: Ensure systemd unit is enabled
+  ansible.builtin.systemd:
+    name: cmgrd.service
+    daemon_reload: yes
+    enabled: yes
+
 - name: Determine whether to restart the cmgrd service
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
