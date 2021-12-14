@@ -7,6 +7,12 @@ servers or webshell toolbox servers.
 
 Like all other roles in this collection, this currently targets contemporary Ubuntu releases only.
 
+### Package upgrades
+
+While disabled by default, this role includes a way to programmatically upgrade installed packages
+([`upgrade_packages: yes`](#role-variables)). This may be useful in situations where CI workflows
+are used to administrate servers.
+
 ### Limited maximum journald size
 
 This role
