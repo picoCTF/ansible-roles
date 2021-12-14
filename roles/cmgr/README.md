@@ -29,6 +29,7 @@ systemd service to automatically handle the distribution of build artifacts.
 | --- | --- | --- |
 | version | cmgr release version to install (e.g. `vX.Y.Z`). Can also be set to `latest` to automatically find the newest version. | `latest` |
 | upgrade | Whether to upgrade an existing cmgr installation. Note that version upgrades may include breaking changes. Always check the release notes before enabling this option. | `false` |
+| clean_upgrade | If enabled along with `upgrade`, will attempt to remove any existing cmgr database, artifact tarballs, containers, and images prior to upgrading cmgr. Useful if upgrading to a cmgr version with an incompatible database schema. Unlike `upgrade` alone, forces reinstallation even when specified cmgr version has not changed.| `false` |
 | download_example_challenges | Whether to download the provided example challenges when installing cmgr. | `false` |
 | example_challenge_dir | Destination directory for downloaded example challenges. Will be deleted and recreated upon (re)installation. This variable only takes effect during installation and upgrades. | `/challenges/examples/` |
 | wrapper_enabled | Wraps the `cmgr` binary with a script that automatically sets any necessary [environment variables](https://github.com/ArmyCyberInstitute/cmgr#configuration) to match the [`cmgrd` service configuration](#cmgrd-service-configuration). This variable only takes effect during installation and upgrades. | `true` |

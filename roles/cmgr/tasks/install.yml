@@ -23,7 +23,7 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    installation_required: "{{ (not cmgr_binary.stat.exists) or (upgrade and version != 'latest' and cmgr_version_output.stdout != version) or (upgrade and version == 'latest' and cmgr_version_output.stdout != latest_version_response.url.split('/tag/')[1]) }}"
+    installation_required: "{{ clean_upgrade or (not cmgr_binary.stat.exists) or (upgrade and version != 'latest' and cmgr_version_output.stdout != version) or (upgrade and version == 'latest' and cmgr_version_output.stdout != latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:

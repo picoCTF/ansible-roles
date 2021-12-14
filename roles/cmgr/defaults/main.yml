@@ -1,6 +1,7 @@
 ---
 version: "latest"
 upgrade: no
+clean_upgrade: no
 download_example_challenges: no
 example_challenge_dir: "{{ challenge_dir }}/examples"
 wrapper_enabled: yes

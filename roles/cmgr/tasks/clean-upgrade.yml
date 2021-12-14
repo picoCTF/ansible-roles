@@ -1,0 +1,46 @@
+---
+# Attempts to remove any existing cmgr database, artifact tarballs, containers, and images prior to upgrading cmgr.
+
+- name: Ensure cmgrd service is stopped
+  ansible.builtin.service:
+    name: cmgrd
+    state: stopped
+  become: yes
+  register: cmgrd_service
+  failed_when: cmgrd_service is failed and not 'Could not find the requested service' in cmgrd_service.msg
+  retries: 0
+  until: cmgrd_service.status.ActiveState == "stopped"
+
+- name: Ensure cmgr-artifact-server service is stopped
+  ansible.builtin.service:
+    name: cmgr_artifact_server
+    state: stopped
+  become: yes
+  register: artifact_server_service
+  failed_when: artifact_server_service is failed and not 'Could not find the requested service' in artifact_server_service.msg
+  retries: 0
+  until: artifact_server_service.status.ActiveState == "stopped"
+
+- name: Remove existing cmgr database
+  ansible.builtin.file:
+    path: "{{ cmgr_db }}"
+    state: absent
+
+- name: Remove existing artifact tarballs
+  ansible.builtin.shell: /bin/rm -rf {{ cmgr_artifact_dir }}/*
+
+- name: Remove existing cmgr containers and networks
+  ansible.builtin.shell: |
+    CMGR_NETWORKS=`docker network ls --filter=name=cmgr -q`
+    for NETWORK in $CMGR_NETWORKS
+    do
+      CONTAINERS=`docker container ls --filter=network=$NETWORK -q`
+      for CONTAINER in $CONTAINERS
+      do
+        docker container rm --force $CONTAINER
+      done
+      docker network rm $NETWORK
+    done
+
+- name: Prune unused Docker images
+  ansible.builtin.shell: docker image prune --all --force
