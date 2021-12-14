@@ -2,8 +2,8 @@
 
 ## Description
 
-Various OS-level tweaks suitable for hosts used as long-running picoCTF platform components like
-challenge servers or webshell toolbox servers.
+Various OS-level settings suitable for hosts used as picoCTF platform components like challenge
+servers or webshell toolbox servers.
 
 Like all other roles in this collection, this currently targets contemporary Ubuntu releases only.
 
@@ -25,5 +25,6 @@ with application-specific port assignments, such as [`cmgr_port_range`](../cmgr/
 
 | Name | Description | Default |
 | --- | --- | --- |
+| `upgrade_packages` | Run `apt-get update && apt-get upgrade` when this role is run. Be careful when running this, as packages used by other roles may be affected. Note that (unless manually disabled), Ubuntu already automatically installs essential security updates via `unattended-upgrades`. | `false` |
 | `journald_max_size` | Maximum size of retained journald logs. Applies to both volatile and persistent log storage. | `500M` |
 | `ephemeral_port_range` | Custom ephemeral port range for the operating system, e.g. `32768-60999`. Note that **the host will restart** if this value is changed, to ensure that all services read the new range. | unset |
