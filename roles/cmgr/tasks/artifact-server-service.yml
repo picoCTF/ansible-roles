@@ -20,7 +20,7 @@
 
 - name: Ensure systemd unit is enabled
   ansible.builtin.systemd:
-    name: cmgrd_artifact_server.service
+    name: cmgr_artifact_server.service
     daemon_reload: yes
     enabled: yes
 
