@@ -28,6 +28,7 @@
 
 - name: Remove existing artifact tarballs
   ansible.builtin.shell: /bin/rm -rf {{ cmgr_artifact_dir }}/*
+  environment: "{{ cmgr_extra_environment_vars }}"
 
 - name: Remove existing cmgr containers and networks
   ansible.builtin.shell: |
@@ -41,6 +42,8 @@
       done
       docker network rm $NETWORK
     done
+  environment: "{{ cmgr_extra_environment_vars }}"
 
 - name: Prune unused Docker images
   ansible.builtin.shell: docker image prune --all --force
+  environment: "{{ cmgr_extra_environment_vars }}"
