@@ -195,4 +195,5 @@
     - "{{ ca_cert_path }}"
     - "{{ client_cert_path }}"
     - "{{ client_key_path }}"
+  changed_when: false
   when: tls_fetch_certs
