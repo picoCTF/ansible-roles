@@ -4,7 +4,8 @@ Documentation=https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Ins
 ConditionArchitecture=x86-64
 
 [Service]
-Type=forking
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:{{ config_file_path }}
 
 [Install]
