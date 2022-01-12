@@ -22,6 +22,7 @@ though they may be portable to other platforms with minor changes.
 | [docker](./roles/docker/README.md) | Configures Docker Engine with ideal settings for platform components. |
 | [cmgr](./roles/cmgr/README.md) | Installs cmgr and optionally configures a cmgrd server. |
 | [actions_runner](./roles/actions_runner/README.md) | Installs the self-hosted GitHub Actions runner. |
+| [cloudwatch_agent](./roles/cloudwatch_agent/README.md) | Installs and configures the AWS CloudWatch Agent. |
 
 ## Quick Start
 

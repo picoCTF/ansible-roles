@@ -1,0 +1,26 @@
+---
+
+# Configure the CloudWatch Agent to run as a systemd service.
+
+- name: Ensure agent systemd unit exists
+  ansible.builtin.template:
+    src: "cloudwatch_agent.service.j2"
+    dest: "{{ systemd_unit_dir }}/cloudwatch_agent.service"
+    lstrip_blocks: yes
+    force: yes
+  register: agent_unit
+  notify:
+    - Reload systemd config
+
+- name: Ensure agent unit is enabled
+  ansible.builtin.systemd:
+    name: cloudwatch_agent.service
+    daemon_reload: yes
+    enabled: yes
+
+- name: Determine whether to restart the agent service
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart agent
+  when: agent_package.changed or agent_unit.changed or agent_config.changed

@@ -1,0 +1,14 @@
+---
+- { include: install.yml, become: yes }
+- { include: configure.yml, become: yes }
+- { include: service.yml, become: yes }
+
+- ansible.builtin.meta: flush_handlers
+
+- name: Ensure agent service is active
+  ansible.builtin.service:
+    name: cloudwatch_agent
+    state: started
+  become: yes
+  register: agent_service
+  until: agent_service.status.ActiveState == "active"

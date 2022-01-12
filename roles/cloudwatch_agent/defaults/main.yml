@@ -1,0 +1,9 @@
+---
+config_contents:
+  metrics:
+    metrics_collected:
+      mem:
+        measurement: ["used_percent"]
+      disk:
+        resources: ["/"]
+        measurement: ["used_percent"]

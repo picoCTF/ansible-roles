@@ -1,0 +1,5 @@
+---
+# recommended default location per https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html
+config_file_path: "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+
+systemd_unit_dir: "/etc/systemd/system/"

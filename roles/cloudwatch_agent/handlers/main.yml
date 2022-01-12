@@ -1,0 +1,11 @@
+---
+- name: Reload systemd config
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Restart agent
+  ansible.builtin.service:
+    name: cloudwatch_agent
+    state: restarted
+  become: yes

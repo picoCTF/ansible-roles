@@ -1,0 +1,9 @@
+---
+
+- name: Update agent configuration
+  ansible.builtin.template:
+    src: "agent_config.j2"
+    dest: "{{ config_file_path }}"
+    lstrip_blocks: yes
+    force: yes
+  register: agent_config

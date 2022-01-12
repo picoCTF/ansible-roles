@@ -1,0 +1,7 @@
+---
+
+- name: Ensure agent is installed and up to date
+  # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/install-CloudWatch-Agent-commandline-fleet.html
+  ansible.builtin.apt:
+    deb: "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+  register: agent_package
