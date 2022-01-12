@@ -1,5 +1,16 @@
 ---
-# recommended default location per https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html
-config_file_path: "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+# If we write the config file to the default path
+# (/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json)
+# recommended by the docs[0], it is copied into amazon-cloudwatch-agent.d and
+# deleted each time the agent is called with `-a fetch-config`.
+#
+# We want to keep the original config file around so that it can be fetched each
+# time the systemd service is restarted, and so that Ansible can detect whether
+# any changes have been made since it was last templated. By storing it
+# one directory level higher, in /opt/aws/amazon-cloudwatch-agent/, it no
+# longer gets deleted after being fetched.
+#
+# [0](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html)
+config_file_path: "/opt/aws/amazon-cloudwatch-agent/config.json"
 
 systemd_unit_dir: "/etc/systemd/system/"
