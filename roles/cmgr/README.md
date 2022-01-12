@@ -53,7 +53,7 @@ when calling `cmgr`.
 | cmgr_registry_user | Username to use when authenticating with `cmgr_registry` | unset |
 | cmgr_registry_token | Password/token to use when authenticating with `cmgr_registry` | unset |
 | cmgr_ports | Specifc range of ports (e.g. `49152-65535`) to use for hosting challenge containers. Assumes that cmgr(d) has exclusive control of these ports. If unspecified, containers will use random ephemeral ports and will become out-of-sync with the cmgr database if restarted. Consider using in conjunction with the [`OS` role's](../os/README.md) `ephemeral_port_range` variable to avoid potential conflicts. | unset |
-| cmgr_extra_environment_vars | Extra environment variables to set for the cmgrd service. | `{}` |
+| cmgr_extra_environment_vars | Extra environment variables to set for the cmgrd service, as a map of string to string. | `{}` |
 
 ### Artifact server configuration
 
@@ -66,4 +66,4 @@ The `cmgr_artifact_dir` variable defined above is also used for the artifact ser
 | artifact_server_service_enabled | Whether to automatically run `cmgr-artifact-server` as a systemd service. | `true` |
 | artifact_server_backend | Artifact server backend to use. | `selfhosted` |
 | artifact_server_other_options | Additional command-line options to pass to `cmgr-artifact-server`, e.g. `--backend-opt some=value --log-level debug`. | unset |
-| artifact_server_extra_environment_vars | Extra environment variables to set for the cmgrd-artifact-server service. | `{}` |
+| artifact_server_extra_environment_vars | Extra environment variables to set for the cmgrd-artifact-server service, as a map of string to string. | `{}` |
