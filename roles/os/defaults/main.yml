@@ -2,3 +2,4 @@
 upgrade_packages: false
 journald_max_size: "500M"
 ephemeral_port_range: null
+hostname: null

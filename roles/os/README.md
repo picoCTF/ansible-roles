@@ -27,6 +27,10 @@ The operating system's ephemeral port range (`/proc/sys/net/ipv4/ip_local_port_r
 customized. This may be useful in order to make sure that the ephemeral port range does not conflict
 with application-specific port assignments, such as [`cmgr_port_range`](../cmgr/README.md).
 
+### Hostname
+
+This role can optionally set a machine's hostname via the `hostname` role variable.
+
 ## Role Variables
 
 | Name | Description | Default |
@@ -34,3 +38,4 @@ with application-specific port assignments, such as [`cmgr_port_range`](../cmgr/
 | `upgrade_packages` | Run `apt-get update && apt-get upgrade` when this role is run. Be careful when running this, as packages used by other roles may be affected. Note that (unless manually disabled), Ubuntu already automatically installs essential security updates via `unattended-upgrades`. | `false` |
 | `journald_max_size` | Maximum size of retained journald logs. Applies to both volatile and persistent log storage. | `500M` |
 | `ephemeral_port_range` | Custom ephemeral port range for the operating system, e.g. `49152-65535`. Note that **the host will restart** if this value is changed, to ensure that all services read the new range. | unset |
+| `hostname` | If specified, the machine's hostname will be set to this value. | unset |
