@@ -1,0 +1,22 @@
+# Increases the default keyring number/size quotas[0] for nonroot users to match the
+# default values for root users. This helps to avoid keyring exhaustion errors when
+# running large numbers of containers[1] when user namespace remapping is enabled.
+# [0]: https://manpages.ubuntu.com/manpages/focal/man7/keyrings.7.html
+# [1]: https://github.com/moby/moby/issues/22865
+
+- name: Set nonroot keyring maxkeys quota
+  ansible.posix.sysctl:
+    name: kernel.keys.maxkeys
+    value: "1000000"
+    state: present
+    sysctl_set: yes
+  when: userns_remap_enabled
+
+
+- name: Set nonroot keyring maxbytes quota
+  ansible.posix.sysctl:
+    name: kernel.keys.maxbytes
+    value: "25000000"
+    state: present
+    sysctl_set: yes
+  when: userns_remap_enabled

@@ -7,6 +7,7 @@
 - { include: parent-cgroup.yml, become: yes }
 - { include: oci-interceptor.yml, become: yes, when: oci_interceptor_enabled }
 - { include: iptables.yml, become: yes, when: custom_networks_outbound_access_blocked }
+- { include: sysctls.yml, become: yes }
 - { include: config.yml, become: yes }
 - ansible.builtin.meta: flush_handlers
 - name: Ensure Docker service is active
