@@ -120,6 +120,8 @@ variables [listed below](#logging-settings).
 
 ### Outbound access for custom Docker networks
 
+**Warning: This feature does not yet work as expected. Please do not enable it.**
+
 Though not enabled by default, a setting is provided which prevents outbound network access from
 containers on custom Docker bridge networks, such as
 [cmgr](https://github.com/ArmyCyberInstitute/cmgr) challenges or
