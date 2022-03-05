@@ -99,4 +99,4 @@
     lstrip_blocks: yes
     force: yes
     mode: "0755"
-  when: installation_required and wrapper_enabled
+  when: wrapper_enabled
