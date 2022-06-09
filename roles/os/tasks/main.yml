@@ -1,5 +1,23 @@
 ---
-- { include: upgrade.yml, become: yes, when: upgrade_packages }
-- { include: journald.yml, become: yes }
-- { include: sysctls.yml, become: yes }
-- { include: hostname.yml, become: yes, when: hostname }
+
+- include_tasks: upgrade.yml
+  when: upgrade_packages
+  args:
+    apply:
+      become: yes
+
+- include_tasks: journald.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: sysctls.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: hostname.yml
+  when: hostname
+  args:
+    apply:
+      become: yes

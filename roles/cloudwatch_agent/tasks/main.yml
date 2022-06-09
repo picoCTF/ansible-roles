@@ -1,7 +1,19 @@
 ---
-- { include: install.yml, become: yes }
-- { include: configure.yml, become: yes }
-- { include: service.yml, become: yes }
+
+- include_tasks: install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: configure.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: service.yml
+  args:
+    apply:
+      become: yes
 
 - ansible.builtin.meta: flush_handlers
 

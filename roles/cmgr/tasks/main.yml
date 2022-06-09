@@ -1,10 +1,35 @@
 ---
-- { include: clean-upgrade.yml, become: yes, when: upgrade and clean_upgrade }
-- { include: install.yml, become: yes }
-- { include: service.yml, become: yes, when: cmgrd_service_enabled }
-- { include: artifact-server-install.yml, become: yes }
-- { include: artifact-server-service.yml, become: yes, when: artifact_server_service_enabled }
+
+- include_tasks: clean-upgrade.yml
+  when: upgrade and clean_upgrade
+  args:
+    apply:
+      become: yes
+
+- include_tasks: install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: service.yml
+  when: cmgrd_service_enabled
+  args:
+    apply:
+      become: yes
+
+- include_tasks: artifact-server-install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: artifact-server-service.yml
+  when: artifact_server_service_enabled
+  args:
+    apply:
+      become: yes
+
 - ansible.builtin.meta: flush_handlers
+
 - name: Ensure cmgrd service is active
   ansible.builtin.service:
     name: cmgrd
@@ -13,6 +38,7 @@
   when: cmgrd_service_enabled
   register: cmgrd_service
   until: cmgrd_service.status.ActiveState == "active"
+
 - name: Ensure cmgr-artifact-server service is active
   ansible.builtin.service:
     name: cmgr_artifact_server

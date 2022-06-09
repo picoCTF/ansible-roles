@@ -1,15 +1,61 @@
 ---
-- { include: install.yml, become: yes }
-- { include: install-compose.yml, become: yes }
-- { include: group.yml, become: yes }
-- { include: certs.yml, become: yes, when: tls_access }
-- { include: storage.yml, become: yes, when: storage_quotas }
-- { include: parent-cgroup.yml, become: yes }
-- { include: oci-interceptor.yml, become: yes, when: oci_interceptor_enabled }
-- { include: iptables.yml, become: yes, when: custom_networks_outbound_access_blocked }
-- { include: sysctls.yml, become: yes }
-- { include: config.yml, become: yes }
+
+- include_tasks: install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: install-compose.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: group.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: certs.yml
+  when: tls_access
+  args:
+    apply:
+      become: yes
+
+- include_tasks: storage.yml
+  when: storage_quotas
+  args:
+    apply:
+      become: yes
+
+- include_tasks: parent-cgroup.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: oci-interceptor.yml
+  when: oci_interceptor_enabled
+  args:
+    apply:
+      become: yes
+
+- include_tasks: iptables.yml
+  when: custom_networks_outbound_access_blocked
+  args:
+    apply:
+      become: yes
+
+- include_tasks: sysctls.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: config.yml
+  args:
+    apply:
+      become: yes
+
 - ansible.builtin.meta: flush_handlers
+
 - name: Ensure Docker service is active
   ansible.builtin.service:
     name: docker
@@ -17,6 +63,7 @@
   become: yes
   register: docker_service
   until: docker_service.status.ActiveState == "active"
+
 - name: Ensure iptables rules service is active
   ansible.builtin.service:
     name: docker_iptables_rules
