@@ -10,7 +10,7 @@
     value: "1000000"
     state: present
     sysctl_set: yes
-  when: userns_remap_enabled
+  when: userns_remap_enabled | bool
 
 
 - name: Set nonroot keyring maxbytes quota
@@ -19,4 +19,4 @@
     value: "25000000"
     state: present
     sysctl_set: yes
-  when: userns_remap_enabled
+  when: userns_remap_enabled | bool

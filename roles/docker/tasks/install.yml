@@ -28,7 +28,7 @@
       - docker-ce
       - docker-ce-cli
       - containerd.io
-    state: "{{ 'latest' if upgrade else 'present' }}"
+    state: "{{ 'latest' if (upgrade | bool) else 'present' }}"
     update_cache: yes
   notify:
     - Restart Docker

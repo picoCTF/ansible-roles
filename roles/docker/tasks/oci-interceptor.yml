@@ -10,7 +10,7 @@
 - name: Determine installed oci-interceptor version
   ansible.builtin.command:
     cmd: echo v`{{ oci_interceptor_install_path }}/oci-interceptor -V | cut -d ' ' -f 2,2`"
-  when: oci_interceptor_upgrade and oci_interceptor_binary.stat.exists
+  when: (oci_interceptor_upgrade | bool) and oci_interceptor_binary.stat.exists
   register: oci_interceptor_version_output
 
 - name: Determine latest oci-interceptor version
@@ -19,11 +19,11 @@
     method: HEAD
     follow_redirects: safe
   register: oci_interceptor_latest_version_response
-  when: oci_interceptor_version == "latest" and (not oci_interceptor_binary.stat.exists or oci_interceptor_upgrade)
+  when: oci_interceptor_version == "latest" and (not oci_interceptor_binary.stat.exists or (oci_interceptor_upgrade | bool))
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    oci_interceptor_installation_required: "{{ (not oci_interceptor_binary.stat.exists) or (oci_interceptor_upgrade and oci_interceptor_version != 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_version) or (oci_interceptor_upgrade and oci_interceptor_version == 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_latest_version_response.url.split('/tag/')[1]) }}"
+    oci_interceptor_installation_required: "{{ (not oci_interceptor_binary.stat.exists) or ((oci_interceptor_upgrade | bool) and oci_interceptor_version != 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_version) or ((oci_interceptor_upgrade | bool) and oci_interceptor_version == 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for download
   ansible.builtin.tempfile:

@@ -12,7 +12,7 @@
 - name: Ensure cryptography is installed  # community.crypto collection dependency
   ansible.builtin.pip:
     name: cryptography
-    state: "{{ 'latest' if (upgrade or tls_renew_certs) else 'present' }}"
+    state: "{{ 'latest' if ((upgrade | bool) or (tls_renew_certs | bool)) else 'present' }}"
 
 - name: Ensure Docker TLS certificate directory exists
   ansible.builtin.file:
@@ -50,7 +50,7 @@
 
 - name: Determine whether to recreate CA cert
   ansible.builtin.set_fact:
-    recreate_ca_cert: "{{ not ca_cert.stat.exists or not ca_key.stat.exists or (not ca_cert_info is skipped and tls_renew_certs and not ca_cert_info.valid_at['now']) }}"
+    recreate_ca_cert: "{{ not ca_cert.stat.exists or not ca_key.stat.exists or (not ca_cert_info is skipped and (tls_renew_certs | bool) and not ca_cert_info.valid_at['now']) }}"
 
 - name: Recreate private key for CA
   community.crypto.openssl_privatekey:
@@ -196,4 +196,4 @@
     - "{{ client_cert_path }}"
     - "{{ client_key_path }}"
   changed_when: false
-  when: tls_fetch_certs
+  when: tls_fetch_certs | bool

@@ -16,13 +16,13 @@
       become: yes
 
 - include_tasks: certs.yml
-  when: tls_access
+  when: tls_access | bool
   args:
     apply:
       become: yes
 
 - include_tasks: storage.yml
-  when: storage_quotas
+  when: storage_quotas | bool
   args:
     apply:
       become: yes
@@ -33,13 +33,13 @@
       become: yes
 
 - include_tasks: oci-interceptor.yml
-  when: oci_interceptor_enabled
+  when: oci_interceptor_enabled | bool
   args:
     apply:
       become: yes
 
 - include_tasks: iptables.yml
-  when: custom_networks_outbound_access_blocked
+  when: custom_networks_outbound_access_blocked | bool
   args:
     apply:
       become: yes
@@ -69,4 +69,4 @@
     name: docker_iptables_rules
     state: started
   become: yes
-  when: custom_networks_outbound_access_blocked
+  when: custom_networks_outbound_access_blocked | bool

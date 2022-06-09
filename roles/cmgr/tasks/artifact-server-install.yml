@@ -10,7 +10,7 @@
 - name: Determine installed cmgr-artifact-server version
   ansible.builtin.command:
     cmd: echo v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
-  when: artifact_server_upgrade and artifact_server_binary.stat.exists
+  when: (artifact_server_upgrade | bool) and artifact_server_binary.stat.exists
   register: artifact_server_version_output
 
 - name: Determine latest cmgr-artifact-server version
@@ -19,11 +19,11 @@
     method: HEAD
     follow_redirects: safe
   register: artifact_server_latest_version_response
-  when: artifact_server_version == "latest" and (not artifact_server_binary.stat.exists or artifact_server_upgrade)
+  when: artifact_server_version == "latest" and (not artifact_server_binary.stat.exists or (artifact_server_upgrade | bool))
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or (artifact_server_upgrade and artifact_server_version != 'latest' and artifact_server_version_output.stdout != artifact_server_version) or (artifact_server_upgrade and artifact_server_version == 'latest' and artifact_server_version_output.stdout != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
+    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and artifact_server_version_output.stdout != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and artifact_server_version_output.stdout != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:

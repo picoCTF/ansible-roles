@@ -1,7 +1,7 @@
 ---
 
 - include_tasks: clean-upgrade.yml
-  when: upgrade and clean_upgrade
+  when: (upgrade | bool) and (clean_upgrade | bool)
   args:
     apply:
       become: yes
@@ -12,7 +12,7 @@
       become: yes
 
 - include_tasks: service.yml
-  when: cmgrd_service_enabled
+  when: cmgrd_service_enabled | bool
   args:
     apply:
       become: yes
@@ -23,7 +23,7 @@
       become: yes
 
 - include_tasks: artifact-server-service.yml
-  when: artifact_server_service_enabled
+  when: artifact_server_service_enabled | bool
   args:
     apply:
       become: yes
@@ -35,7 +35,7 @@
     name: cmgrd
     state: started
   become: yes
-  when: cmgrd_service_enabled
+  when: cmgrd_service_enabled | bool
   register: cmgrd_service
   until: cmgrd_service.status.ActiveState == "active"
 
@@ -44,6 +44,6 @@
     name: cmgr_artifact_server
     state: started
   become: yes
-  when: artifact_server_service_enabled
+  when: artifact_server_service_enabled | bool
   register: artifact_server_service
   until: artifact_server_service.status.ActiveState == "active"

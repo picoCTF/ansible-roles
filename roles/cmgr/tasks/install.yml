@@ -10,7 +10,7 @@
 - name: Determine installed cmgr version
   ansible.builtin.command:
     cmd: "{{ install_location }}/cmgr version"
-  when: upgrade and cmgr_binary.stat.exists
+  when: (upgrade | bool) and cmgr_binary.stat.exists
   register: cmgr_version_output
 
 - name: Determine latest cmgr version
@@ -19,11 +19,11 @@
     method: HEAD
     follow_redirects: safe
   register: latest_version_response
-  when: version == "latest" and (not cmgr_binary.stat.exists or upgrade)
+  when: version == "latest" and (not cmgr_binary.stat.exists or (upgrade | bool))
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    installation_required: "{{ clean_upgrade or (not cmgr_binary.stat.exists) or (upgrade and version != 'latest' and cmgr_version_output.stdout != version) or (upgrade and version == 'latest' and cmgr_version_output.stdout != latest_version_response.url.split('/tag/')[1]) }}"
+    installation_required: "{{ (clean_upgrade | bool) or (not cmgr_binary.stat.exists) or ((upgrade | bool) and version != 'latest' and cmgr_version_output.stdout != version) or ((upgrade | bool) and version == 'latest' and cmgr_version_output.stdout != latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:

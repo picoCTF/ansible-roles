@@ -1,7 +1,7 @@
 ---
 
 - include_tasks: upgrade.yml
-  when: upgrade_packages
+  when: upgrade_packages | bool
   args:
     apply:
       become: yes
