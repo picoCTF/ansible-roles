@@ -5,11 +5,6 @@
     apply:
       become: yes
 
-- include_tasks: install-compose.yml
-  args:
-    apply:
-      become: yes
-
 - include_tasks: group.yml
   args:
     apply:
