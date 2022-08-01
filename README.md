@@ -29,7 +29,7 @@ though they may be portable to other platforms with minor changes.
 1. Install the collection:
 
     ```shell
-    $ ansible-galaxy install picoctf.ansible_roles
+    $ ansible-galaxy collection install -f .
     ```
 
 1. Write a [playbook](https://docs.ansible.com/ansible/latest/user_guide/index.html#writing-tasks-plays-and-playbooks) mapping desired roles to your hosts, e.g.:
