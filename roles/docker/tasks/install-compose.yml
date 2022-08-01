@@ -17,5 +17,5 @@
 - name: Ensure Compose V2 CLI plugin is installed
   ansible.builtin.get_url:
     dest: "/usr/local/lib/docker/cli-plugins/docker-compose"
-    url: "https://github.com/docker/compose/releases/download/v2.8.0/docker-compose-linux-x86_64"
+    url: "https://github.com/docker/compose/releases/download/v2.9.0/docker-compose-linux-x86_64"
     mode: "0755"
