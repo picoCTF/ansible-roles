@@ -28,6 +28,7 @@
       - docker-ce
       - docker-ce-cli
       - containerd.io
+      - docker-buildx-plugin
       - docker-compose-plugin
     state: "{{ 'latest' if (upgrade | bool) else 'present' }}"
     update_cache: yes
