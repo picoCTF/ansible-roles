@@ -31,6 +31,7 @@ galaxy_info:
   - name: Ubuntu
     versions:
     - focal
+    - jammy
 
   galaxy_tags: ["picoctf", "aws", "cloudwatch", "agent"]
     # List tags for your role here, one per line. A tag is a keyword that describes

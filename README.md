@@ -10,7 +10,7 @@ However, some roles include variables which can cause non-idempotent behavior (u
 regenerating certificates, etc.) if set to non-default values. Check each role's README file for a
 full description of configurable variables.
 
-Note that as of this writing, all roles have only been tested on x86_64 Ubuntu 20.04 LTS hosts,
+Note that as of this writing, all roles have only been tested on x86_64 Ubuntu LTS hosts,
 though they may be portable to other platforms with minor changes.
 
 ## Included Roles
