@@ -18,6 +18,9 @@ export CMGR_REGISTRY_TOKEN={{ cmgr_registry_token }}
 {% if cmgr_ports %}
 export CMGR_PORTS={{ cmgr_ports }}
 {% endif %}
+{% if cmgr_enable_disk_quotas %}
+export CMGR_ENABLE_DISK_QUOTAS={{ cmgr_enable_disk_quotas }}
+{% endif %}
 {% for key, value in cmgr_extra_environment_vars.items() %}
 export {{ key }}={{ value }}
 {% endfor %}
