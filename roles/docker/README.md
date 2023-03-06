@@ -158,7 +158,7 @@ that will remain accessible by containers on custom networks. See
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. <br><br>Note that when using container storage quotas, you should probably also set `oci_interceptor_flags` to `[--readonly-networking-mounts]`. Otherwise, it is still possible to exhaust the host graph storage by writing to `/etc/hosts`, `/etc/hostname`, or `/etc/resolv.conf` inside a container. | `true` |
+| `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. <br><br>Note that when using container storage quotas, you should probably also set `oci_interceptor_flags` to `[--oi-readonly-networking-mounts]`. Otherwise, it is still possible to exhaust the host graph storage by writing to `/etc/hosts`, `/etc/hostname`, or `/etc/resolv.conf` inside a container. | `true` |
 | `storage_device` | The block device to format and mount as an XFS filesystem. | `/dev/nvme1n1` |
 
 ### Docker network settings
