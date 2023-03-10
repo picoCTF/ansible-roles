@@ -33,12 +33,6 @@
     apply:
       become: yes
 
-- include_tasks: iptables.yml
-  when: custom_networks_outbound_access_blocked | bool
-  args:
-    apply:
-      become: yes
-
 - include_tasks: firewall.yml
   args:
     apply:
@@ -63,10 +57,3 @@
   become: yes
   register: docker_service
   until: docker_service.status.ActiveState == "active"
-
-- name: Ensure iptables rules service is active
-  ansible.builtin.service:
-    name: docker_iptables_rules
-    state: started
-  become: yes
-  when: custom_networks_outbound_access_blocked | bool
