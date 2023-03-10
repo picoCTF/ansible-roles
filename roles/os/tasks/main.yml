@@ -1,7 +1,7 @@
 ---
 
 - include_tasks: upgrade.yml
-  when: upgrade_packages | bool
+  when: (upgrade_packages != "no") and (upgrade_packages != False)
   args:
     apply:
       become: yes

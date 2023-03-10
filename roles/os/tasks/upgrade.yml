@@ -2,5 +2,5 @@
 
 - name: Upgrade system packages
   ansible.builtin.apt:
-    upgrade: yes
+    upgrade: "{{ upgrade_packages }}"
     update_cache: yes

@@ -10,7 +10,7 @@ Like all other roles in this collection, this currently targets contemporary Ubu
 ### Package upgrades
 
 While disabled by default, this role includes a way to programmatically upgrade installed packages
-([`upgrade_packages: yes`](#role-variables)). This may be useful in situations where CI workflows
+([`upgrade_packages: "yes"`](#role-variables)). This may be useful in situations where CI workflows
 are used to administrate servers.
 
 ### Limited maximum journald size
@@ -35,7 +35,7 @@ This role can optionally set a machine's hostname via the `hostname` role variab
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `upgrade_packages` | Run `apt-get update && apt-get upgrade` when this role is run. Be careful when running this, as packages used by other roles may be affected. Note that (unless manually disabled), Ubuntu already automatically installs essential security updates via `unattended-upgrades`. | `false` |
+| `upgrade_packages` | If set to `"yes"`, run `apt-get update && apt-get upgrade` when this role is run. If set to `"dist"`, runs `apt-get update && apt-get dist-upgrade` instead. Be careful when running this, as packages used by other roles may be affected. Note that (unless manually disabled), Ubuntu already automatically installs essential security updates via `unattended-upgrades`. | `"no"` |
 | `journald_max_size` | Maximum size of retained journald logs. Applies to both volatile and persistent log storage. | `500M` |
 | `ephemeral_port_range` | Custom ephemeral port range for the operating system, e.g. `49152-65535`. Note that **the host will restart** if this value is changed, to ensure that all services read the new range. | unset |
 | `hostname` | If specified, the machine's hostname will be set to this value. | unset |

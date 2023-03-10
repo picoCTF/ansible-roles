@@ -1,5 +1,5 @@
 ---
-upgrade_packages: false
+upgrade_packages: "no"
 journald_max_size: "500M"
 ephemeral_port_range: null
 hostname: null
