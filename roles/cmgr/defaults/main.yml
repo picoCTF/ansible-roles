@@ -5,6 +5,7 @@ clean_upgrade: no
 download_example_challenges: no
 example_challenge_dir: "{{ challenge_dir }}/examples"
 wrapper_enabled: yes
+cmgr_github_url: "https://github.com/ArmyCyberInstitute/cmgr"
 
 cmgrd_service_enabled: yes
 cmgr_db: "{{ challenge_dir }}/cmgr.db"
@@ -25,3 +26,4 @@ artifact_server_service_enabled: yes
 artifact_server_backend: "selfhosted"
 artifact_server_other_options: ""
 artifact_server_extra_environment_vars: {}
+artifact_server_github_url: "https://github.com/picoCTF/cmgr-artifact-server"

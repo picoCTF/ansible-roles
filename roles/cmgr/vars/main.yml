@@ -1,11 +1,9 @@
 ---
 challenge_dir: "/challenges"
 install_location: "/usr/local/bin"
-cmgr_github_url: "https://github.com/ArmyCyberInstitute/cmgr"
 cmgr_binaries_filename: "cmgr_linux_amd64.tar.gz"
 cmgr_examples_filename: "examples.tar.gz"
 
 systemd_unit_dir: "/etc/systemd/system/"
 
-artifact_server_github_url: "https://github.com/picoCTF/cmgr-artifact-server"
 artifact_server_binary_filename: "cmgr-artifact-server_linux_amd64.tar.gz"
