@@ -138,7 +138,7 @@ This is [configurable](#firewall-settings), and additional IPs can be blocked if
 | Name | Description | Default |
 | --- | --- | --- |
 | `tls_access` | Whether the Docker daemon should be externally accessible over TLS | `true` |
-| `tls_expiration_days` | Validity period (in days) for generated TLS certs | `365` |
+| `tls_expiration_days` | Validity period (in days) for generated TLS certs | `3650` |
 | `tls_sans` | Subject Alternative Names to include in the generated server certificate.<br><br>Note: this can be modified without affecting the CA or client certificate, as long as they are still valid. | `["DNS:localhost", "IP:127.0.0.1", "DNS:host.docker.internal"]` |
 | `tls_renew_certs` | Whether to generate new CA and client certs if they have expired | `false` |
 | `tls_fetch_certs` | Whether to fetch generated client certs to the host running Ansible | `true` |
