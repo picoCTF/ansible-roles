@@ -4,15 +4,15 @@
 # Workaround for conflicting 'hosts' value in daemon.json and Docker's default systemd unit
 # (see https://github.com/moby/moby/issues/25471)
 
-- name: Ensure systemd drop-in directory exists
+- name: Ensure docker.service drop-in directory exists
   ansible.builtin.file:
-    path: "{{ systemd_drop_in_dir }}"
+    path: "{{ systemd_docker_drop_in_dir }}"
     state: directory
 
-- name: Ensure drop-in unit exists
+- name: Ensure docker.service drop-in unit exists
   ansible.builtin.copy:
-    src: "override.conf"
-    dest: "{{ systemd_drop_in_dir }}/override.conf"
+    src: "docker.service_override.conf"
+    dest: "{{ systemd_docker_drop_in_dir }}/override.conf"
     force: yes
   notify:
     - Reload systemd config

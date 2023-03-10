@@ -24,3 +24,8 @@
     name: docker_iptables_rules
     state: restarted
   become: yes
+
+- name: Reload ufw
+  community.general.ufw:
+    state: reloaded
+  become: yes

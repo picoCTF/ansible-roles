@@ -13,7 +13,8 @@ client_key_path: "{{ tls_cert_path }}/key.pem"
 client_csr_path: "{{ tls_cert_path }}/cert.csr"
 client_cert_path: "{{ tls_cert_path }}/cert.pem"
 
-systemd_drop_in_dir: "/etc/systemd/system/docker.service.d"
+systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"
+systemd_ufw_drop_in_dir: "/etc/systemd/system/ufw.service.d"
 
 storage_mount_point: "/mnt/docker-data"
 grub_cloudimg_config_path: "/etc/default/grub.d/50-cloudimg-settings.cfg"

@@ -118,6 +118,12 @@ amount of log output retained (30m across 3 files) is somewhat reduced from the 
 sufficient for the majority of use cases. The amount of output retained is customizable using the
 variables [listed below](#logging-settings).
 
+### Firewall rules
+
+Access to the [EC2 metadata endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html) is blocked from all Docker containers by default.
+
+This is [configurable](#firewall-settings), and additional IPs can be blocked if desired.
+
 ### Outbound access for custom Docker networks
 
 **Warning: This feature does not yet work as expected. Please do not enable it.**
@@ -189,6 +195,12 @@ that will remain accessible by containers on custom networks. See
 | --- | --- | --- |
 | `logs_max_size` | Maximum size of an individual container log file. | `10m` |
 | `logs_max_files` | Maximum number of log files to retain per container. If rolling the logs creates excess files, the oldest are deleted. | `3` |
+
+### Firewall settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `container_rejected_ipv4_cidrs` | Traffic to these IPv4 CIDRs from inside containers is dropped. | `["169.254.169.254/32"]` |
 
 ### Custom network outbound access settings
 

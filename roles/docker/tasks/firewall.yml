@@ -1,0 +1,36 @@
+---
+
+# Configures ufw rules to block access to certain CIDRs from inside Docker containers.
+
+- name: Ensure ufw.service drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ systemd_ufw_drop_in_dir }}"
+    state: directory
+
+# Modifies ufw.service to start after docker.service, so that the DOCKER-USER iptables chain exists to modify.
+- name: Ensure ufw.service drop-in unit exists
+  ansible.builtin.copy:
+    src: "ufw.service_override.conf"
+    dest: "{{ systemd_ufw_drop_in_dir }}/override.conf"
+    force: yes
+  notify:
+    - Reload systemd config
+
+- name: Ensure ufw is enabled (with default-allow policy)
+  community.general.ufw:
+    state: enabled
+    policy: allow
+
+- name: Drop traffic from containers to all specified IPv4 CIDRs
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/after.rules
+    block: "-I DOCKER-USER -d {{ item }} -j REJECT -m comment --comment \"Ansible managed\""
+    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
+    insertbefore: "COMMIT"
+  with_items: "{{ container_rejected_ipv4_cidrs }}"
+  notify:
+    - Reload ufw
+
+# IPv6 is not enabled by default in Docker, so no ip6tables DOCKER-USER chain typically(?) exists.
+# If this changes in the future, we can add a container_rejected_ipv6_cidrs variable, including the
+# EC2 metadata endpoint CIDR (fd00:ec2::254/128) by default

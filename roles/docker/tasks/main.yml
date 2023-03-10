@@ -39,6 +39,11 @@
     apply:
       become: yes
 
+- include_tasks: firewall.yml
+  args:
+    apply:
+      become: yes
+
 - include_tasks: sysctls.yml
   args:
     apply:
