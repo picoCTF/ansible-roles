@@ -27,7 +27,7 @@
     block: "-I DOCKER-USER -d {{ item }} -j REJECT -m comment --comment \"Ansible managed\""
     marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
     insertbefore: "COMMIT"
-  with_items: "{{ container_rejected_ipv4_cidrs }}"
+  with_items: "{{ container_deny_ipv4_cidrs }}"
   notify:
     - Reload ufw
 

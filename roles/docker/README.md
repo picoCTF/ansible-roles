@@ -200,7 +200,7 @@ that will remain accessible by containers on custom networks. See
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `container_rejected_ipv4_cidrs` | Traffic to these IPv4 CIDRs from inside containers is dropped. | `["169.254.169.254/32"]` |
+| `container_deny_ipv4_cidrs` | Traffic to these IPv4 CIDRs from inside containers is rejected. | `["169.254.169.254/32"]` |
 
 ### Custom network outbound access settings
 
