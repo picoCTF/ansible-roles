@@ -158,7 +158,7 @@ that will remain accessible by containers on custom networks. See
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. <br><br>Note that when using container storage quotas, you should probably also set `oci_interceptor_flags` to `[--oi-readonly-networking-mounts]`. Otherwise, it is still possible to exhaust the host graph storage by writing to `/etc/hosts`, `/etc/hostname`, or `/etc/resolv.conf` inside a container. | `true` |
+| `storage_quotas` | Whether to enable storage quotas by storing the Docker daemon state in an XFS filesystem. <br><br>Note that when using container storage quotas, `oci_interceptor_flags` should probably include `--oi-readonly-networking-mounts` (and is included by default). Otherwise, it is still possible to exhaust the host graph storage by writing to `/etc/hosts`, `/etc/hostname`, or `/etc/resolv.conf` inside a container. | `true` |
 | `storage_device` | The block device to format and mount as an XFS filesystem. | `/dev/nvme1n1` |
 
 ### Docker network settings
@@ -181,7 +181,7 @@ that will remain accessible by containers on custom networks. See
 | `oci_interceptor_enabled` | Whether to use the `oci-interceptor` runtime wrapper. | `true` |
 | `oci_interceptor_version` | Version of `oci-interceptor` to install. | `latest` |
 | `oci_interceptor_upgrade` | Whether to upgrade `oci-interceptor` if already installed. | `false` |
-| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. | `[]` |
+| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. | `["--oi-readonly-networking-mounts"]` |
 
 ### Logging settings
 

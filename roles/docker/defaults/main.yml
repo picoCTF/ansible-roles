@@ -20,7 +20,7 @@ userns_remap_enabled: yes
 oci_interceptor_enabled: yes
 oci_interceptor_version: "latest"
 oci_interceptor_upgrade: no
-oci_interceptor_flags: []
+oci_interceptor_flags: ["--oi-readonly-networking-mounts"]
 
 logs_max_size: "10m"
 logs_max_files: 3
