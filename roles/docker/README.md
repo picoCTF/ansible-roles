@@ -45,7 +45,7 @@ inoperable.
 ### cgroup parent limits and memory accounting
 
 The Docker daemon is configured to use a custom cgroup parent for all spawned containers. This
-cgroup limits the combined CPU and memory available to all Docker containers to 90% of the system's
+cgroup limits the combined CPU and memory available to all Docker containers to 80% of the system's
 total resources in order to ensure that essential services like `sshd` and `atop` can continue to
 run regardless of the resources used by running containers.
 

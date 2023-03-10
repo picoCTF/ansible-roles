@@ -4,6 +4,7 @@ Before=slices.target
 
 [Slice]
 CPUAccounting=true
-CPUQuota={{ 90 * ansible_processor_nproc }}%
+CPUQuota={{ 80 * ansible_processor_nproc }}%
 MemoryAccounting=true
-MemoryMax=90%
+MemoryHigh=75%
+MemoryMax=80%
