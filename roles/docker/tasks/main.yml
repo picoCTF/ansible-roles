@@ -57,3 +57,11 @@
   become: yes
   register: docker_service
   until: docker_service.status.ActiveState == "active"
+
+- name: Ensure ufw service is active
+  ansible.builtin.service:
+    name: ufw
+    state: started
+  become: yes
+  register: ufw_service
+  until: ufw_service.status.ActiveState == "active"
