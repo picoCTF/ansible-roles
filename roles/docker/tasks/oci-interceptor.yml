@@ -9,7 +9,7 @@
 
 - name: Determine installed oci-interceptor version
   ansible.builtin.command:
-    cmd: echo v`{{ oci_interceptor_install_path }}/oci-interceptor -V | cut -d ' ' -f 2,2`"
+    cmd: echo "v`{{ oci_interceptor_install_path }}/oci-interceptor --oi-version | cut -d ' ' -f 2,2`"
   when: (oci_interceptor_upgrade | bool) and oci_interceptor_binary.stat.exists
   register: oci_interceptor_version_output
 

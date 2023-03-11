@@ -9,7 +9,7 @@
 
 - name: Determine installed cmgr-artifact-server version
   ansible.builtin.command:
-    cmd: echo v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
+    cmd: echo "v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
   when: (artifact_server_upgrade | bool) and artifact_server_binary.stat.exists
   register: artifact_server_version_output
 
