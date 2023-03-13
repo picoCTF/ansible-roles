@@ -20,3 +20,13 @@
     state: present
     sysctl_set: yes
   when: userns_remap_enabled | bool
+
+# Increases the inotify user instance limit, as the default limit of 128 is easily reached when
+# running many containers. See https://github.com/moby/moby/issues/1044
+
+- name: Increase inotify user instances limit
+  ansible.posix.sysctl:
+    name: fs.inotify.max_user_instances
+    value: "8192"
+    state: present
+    sysctl_set: yes
