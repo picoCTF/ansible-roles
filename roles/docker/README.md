@@ -63,8 +63,7 @@ to be connected. However, this limits the total number of simultaneous Docker ne
 When running challenge instances or webshell toolbox containers, we want each instance to be on its
 own isolated network. Only having 32 total networks would be extremely limiting, but fortunately it
 is possible to reduce the subnet size of newly created Docker networks. In this role, we set this
-size to /29 by default, which allows for up to ~140,000 simultaneous Docker networks of up to 5
-containers each (when using the default address pools).
+size to /29 by default, which allows for thousands of Docker networks with up to 5 containers each.
 
 If you are planning to host any challenges which require more than 5 containers, this subnet prefix
 size must be lowered. See [below](#docker-network-settings) for more details.
@@ -155,7 +154,7 @@ This is [configurable](#firewall-settings), and additional IPs can be blocked if
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `network_ip_pools` | Available IP ranges for Docker network creation. Determines the total number of available networks, along with `network_prefix_length`. | `["172.17.0.0/12", "192.168.0.0/16"]` |
+| `network_ip_pools` | Available IP ranges for Docker network creation. Determines the total number of available networks, along with `network_prefix_length`. | `["192.168.0.0/16"]` |
 | `network_prefix_length` | Number of prefix bits to use when creating Docker networks. This determines the number of containers (2^(32-*n*)-3) that can join the network and impacts the total number of available networks.<br><br>The default, `29`, allows 5 containers per network and should be appropriate for most challenge servers. However, this value must be lowered to host challenges with more than 5 running containers per network. | `29` |
 
 ### User namespace settings
