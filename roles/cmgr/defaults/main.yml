@@ -5,7 +5,7 @@ clean_upgrade: no
 download_example_challenges: no
 example_challenge_dir: "{{ challenge_dir }}/examples"
 wrapper_enabled: yes
-cmgr_github_url: "https://github.com/ArmyCyberInstitute/cmgr"
+cmgr_github_url: "https://github.com/picoCTF/cmgr"
 
 cmgrd_service_enabled: yes
 cmgr_db: "{{ challenge_dir }}/cmgr.db"
