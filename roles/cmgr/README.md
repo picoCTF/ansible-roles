@@ -2,7 +2,7 @@
 
 ## Description
 
-Installs the [cmgr](https://github.com/ArmyCyberInstitute/cmgr) CTF challenge manager on a host.
+Installs the [cmgr](https://github.com/picoCTF/cmgr) CTF challenge manager on a host.
 Optionally, the `cmgrd` HTTP daemon can be configured to automatically run as a service with
 specified settings.
 
