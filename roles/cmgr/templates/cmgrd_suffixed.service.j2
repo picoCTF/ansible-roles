@@ -9,9 +9,9 @@ ConditionPathIsDirectory={{ cmgr_dir }}
 [Service]
 Type=exec
 LimitNOFILE=49152
-Environment="CMGR_DB={{ cmgr_db }}"
+Environment="CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_') }}{{ item.suffix }}.db"
 Environment="CMGR_DIR={{ cmgr_dir }}"
-Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}"
+Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}/{{ item.suffix }}"
 Environment="CMGR_LOGGING={{ cmgr_logging }}"
 Environment="CMGR_INTERFACE={{ cmgr_interface }}"
 {% if cmgr_registry %}
@@ -26,10 +26,10 @@ Environment="CMGR_REGISTRY_TOKEN={{ cmgr_registry_token }}"
 {% if cmgr_ports %}
 Environment="CMGR_PORTS={{ cmgr_ports }}"
 {% endif %}
-{% for key, value in cmgr_extra_environment_vars.items() %}
+{% for key, value in item.config.cmgr_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"
 {% endfor %}
-ExecStart={{ install_location }}/cmgrd
+ExecStart={{ install_location }}/cmgrd --port {{ item.config.cmgrd_port }}
 
 [Install]
 WantedBy=multi-user.target

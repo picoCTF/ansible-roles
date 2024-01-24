@@ -10,8 +10,22 @@
     state: restarted
   become: yes
 
+- name: Restart suffixed cmgrds
+  ansible.builtin.service:
+    name: cmgrd_{{ item.suffix }}
+    state: restarted
+  become: yes
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
+
 - name: Restart cmgr artifact server
   ansible.builtin.service:
     name: cmgr_artifact_server
     state: restarted
   become: yes
+
+- name: Restart suffixed cmgr artifact servers
+  ansible.builtin.service:
+    name: cmgr_artifact_server_{{ item.suffix }}
+    state: restarted
+  become: yes
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

@@ -17,16 +17,46 @@
   register: cmgrd_unit
   notify:
     - Reload systemd config
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Ensure suffixed cmgrd systemd units exist
+  ansible.builtin.template:
+    src: "cmgrd_suffixed.service.j2"
+    dest: "{{ systemd_unit_dir }}/cmgrd_{{ item.suffix }}.service"
+    lstrip_blocks: yes
+    force: yes
+  register: "cmgrd_suffixed_units"
+  notify:
+    - Reload systemd config
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Ensure systemd unit is enabled
   ansible.builtin.systemd:
     name: cmgrd.service
     daemon_reload: yes
     enabled: yes
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Ensure suffixed systemd units are enabled
+  ansible.builtin.systemd:
+    name: cmgrd_{{ item.suffix }}.service
+    daemon_reload: yes
+    enabled: yes
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Determine whether to restart the cmgrd service
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:
     - Restart cmgrd
-  when: installation_required or cmgrd_unit.changed
+  when: (installation_required or cmgrd_unit.changed) and ((not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool))
+
+- name: Determine whether to restart suffixed cmgrd services
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart suffixed cmgrds
+  when: (installation_required or cmgrd_suffixed_units.changed) and (multi_mode_enabled | bool)
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

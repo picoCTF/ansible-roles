@@ -2,7 +2,7 @@
 
 ## Description
 
-Installs the [cmgr](https://github.com/ArmyCyberInstitute/cmgr) CTF challenge manager on a host.
+Installs the [cmgr](https://github.com/picoCTF/cmgr) CTF challenge manager on a host.
 Optionally, the `cmgrd` HTTP daemon can be configured to automatically run as a service with
 specified settings.
 
@@ -70,3 +70,59 @@ The `cmgr_artifact_dir` variable defined above is also used for the artifact ser
 | artifact_server_other_options | Additional command-line options to pass to `cmgr-artifact-server`, e.g. `--backend-opt some=value --log-level debug`. | unset |
 | artifact_server_extra_environment_vars | Extra environment variables to set for the cmgrd-artifact-server service, as a map of string to string. | `{}` |
 | artifact_server_github_url | GitHub repo to download `cmgr-artifact-server` from. Can be used to install a forked `cmgr-artifact-server` version, but the repo must have a semver-compliant tagged release for compatibility with the `artifact_server_version` option. | `https://github.com/picoCTF/cmgr-artifact-server` |
+
+### Multi mode
+
+This mode allows multiple instances of `cmgrd` (and `cmgr_artifact_server`) to run on the same host.
+This is designed to facilitate dividing a pool of challenges across multiple remote Docker Engine hosts (by running a unique set of schemas on each cmgrd / Docker Engine pair).
+
+When multi mode is enabled, the following are suffixed by instance name:
+
+- cmgrd systemd services, e.g. `cmgr_foo.service`.
+- cmgr-artifact-server systemd services, e.g. `cmgr_artifact_server_foo.service`.
+- cmgr wrapper scripts, e.g. `cmgr_foo`.
+
+Most configuration variables are shared between all instances and function as normal, with a few exceptions documented below:
+
+- `wrapper_enabled`: Always enabled. Suffixed wrapper scripts are necessary to disambiguate between cmgr instances.
+- `cmgr_db`: A suffix will be added to each instance's database file, e.g. `cmgr_foo.db`.
+- `cmgr_artifact_dir`: Subdirectories will be created for each instance.
+- `cmgr_extra_environment_vars`: Ignored. Specify per-instance using `multi_mode_config`.
+- `artifact_server_other_options`: Ignored. Specify per-instance using `multi_mode_config`.
+- `artifact_server_extra_environment_vars`: Ignored. Specify per-instance using `multi_mode_config`.
+
+Note that multi mode will only function correctly if each cmgr instance is configured to use a distinct remote Docker engine (by specifying `DOCKER_HOST`, `DOCKER_TLS_VERIFY`, and `DOCKER_CERT_PATH` in `cmgr_extra_environment_vars`).
+
+| Name | Description | Default |
+| --- | --- | --- |
+| multi_mode_enabled | Run multiple instances of `cmgrd` and `cmgr_artifact_server` based on the `multi_mode_configuration` object. | `false` |
+| multi_mode_config | Nested mapping containing per-instance configuration. See example value below. | `{}` |
+| multi_mode_include_unsuffixed | Also run the standard, unsuffixed `cmgrd` and `cmgr_artifact_server` services, even when multi mode is enabled. Can be used to convert an existing deployment to a multi-instance server. | `false` |
+
+#### Example `multi_mode_config` value
+
+```yaml
+multi_mode_config:
+  foo:
+    cmgrd_port: 4202
+    cmgr_extra_environment_vars: {
+      "DOCKER_HOST": "tcp://foo.docker.host:2376",
+      "DOCKER_TLS_VERIFY": "true",
+      "DOCKER_CERT_PATH": "/mnt/data/foo-certs",
+    }
+    artifact_server_other_options: "-o address=0.0.0.0:4203"
+    artifact_server_extra_environment_vars: {
+      "variable": "foo"
+    }
+  bar:
+    cmgrd_port: 4204
+    cmgr_extra_environment_vars: {
+      "DOCKER_HOST": "tcp://bar.docker.host:2376",
+      "DOCKER_TLS_VERIFY": "true",
+      "DOCKER_CERT_PATH": "/mnt/data/bar-certs",
+    }
+    artifact_server_other_options: "-o address=0.0.0.0:4205"
+    artifact_server_extra_environment_vars: {
+      "variable": "foo"
+    }
+```

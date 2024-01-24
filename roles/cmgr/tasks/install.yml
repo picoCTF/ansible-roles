@@ -4,12 +4,12 @@
 
 - name: Check whether cmgr is installed
   ansible.builtin.stat:
-    path: "{{ install_location }}/cmgr"
+    path: "{{ install_location }}/cmgr_bin"
   register: cmgr_binary
 
 - name: Determine installed cmgr version
   ansible.builtin.command:
-    cmd: "{{ install_location }}/cmgr version"
+    cmd: "{{ install_location }}/cmgr_bin version"
   when: (upgrade | bool) and cmgr_binary.stat.exists
   register: cmgr_version_output
 
@@ -87,10 +87,10 @@
     state: absent
   when: installation_required
 
-- name: Rename cmgr binary
+- name: Create _bin-suffixed copy of cmgr binary
   ansible.builtin.command:
-    cmd: mv {{ install_location }}/cmgr {{ install_location }}/cmgr_bin
-  when: installation_required and wrapper_enabled
+    cmd: cp {{ install_location }}/cmgr {{ install_location }}/cmgr_bin
+  when: installation_required
 
 - name: Add environment variable wrapper
   ansible.builtin.template:
@@ -100,3 +100,13 @@
     force: yes
     mode: "0755"
   when: wrapper_enabled
+
+- name: Add suffixed environment variable wrappers
+  ansible.builtin.template:
+    src: "cmgr_suffixed.j2"
+    dest: "{{ install_location }}/cmgr_{{ item.suffix }}"
+    lstrip_blocks: yes
+    force: yes
+    mode: "0755"
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

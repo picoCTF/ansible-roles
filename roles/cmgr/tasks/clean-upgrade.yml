@@ -10,6 +10,19 @@
   failed_when: cmgrd_service is failed and not 'Could not find the requested service' in cmgrd_service.msg
   retries: 0
   until: cmgrd_service.status.ActiveState == "stopped"
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Ensure suffixed cmgrd services are stopped
+  ansible.builtin.service:
+    name: "cmgrd_{{ item.suffix }}"
+    state: stopped
+  become: yes
+  register: "cmgrd_{{ item.suffix }}"
+  failed_when: cmgrd_{{ item.suffix }} is failed and not 'Could not find the requested service' in cmgrd_{{ item.suffix }}.msg
+  retries: 0
+  until: cmgrd_{{ item.suffix }}.status.ActiveState == "stopped"
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Ensure cmgr-artifact-server service is stopped
   ansible.builtin.service:
@@ -20,15 +33,37 @@
   failed_when: artifact_server_service is failed and not 'Could not find the requested service' in artifact_server_service.msg
   retries: 0
   until: artifact_server_service.status.ActiveState == "stopped"
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Ensure suffixed cmgr-artifact-server services are stopped
+  ansible.builtin.service:
+    name: "cmgr_artifact_server_{{ item.suffix }}"
+    state: stopped
+  become: yes
+  register: "artifact_server_service_{{ item.suffix }}"
+  failed_when: artifact_server_service_{{ item.suffix }} is failed and not 'Could not find the requested service' in artifact_server_service_{{ item.suffix }}.msg
+  retries: 0
+  until: artifact_server_service_{{ item.suffix }}.status.ActiveState == "stopped"
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Remove existing cmgr database
   ansible.builtin.file:
     path: "{{ cmgr_db }}"
     state: absent
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Remove suffixed cmgr databases
+  ansible.builtin.file:
+    path: "{{ cmgr_db | replace('cmgr.db', 'cmgr_') }}{{ item.suffix }}.db"
+    state: absent
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
+
 
 - name: Remove existing artifact tarballs
   ansible.builtin.shell: /bin/rm -rf {{ cmgr_artifact_dir }}/*
-  environment: "{{ cmgr_extra_environment_vars }}"
+  # Multi mode creates subdirectories, so this command is sufficient
 
 - name: Remove existing cmgr containers and networks
   ansible.builtin.shell: |
@@ -43,7 +78,31 @@
       docker network rm $NETWORK
     done
   environment: "{{ cmgr_extra_environment_vars }}"
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Remove existing cmgr containers and networks for multi mode instances
+  ansible.builtin.shell: |
+    CMGR_NETWORKS=`docker network ls --filter=name=cmgr -q`
+    for NETWORK in $CMGR_NETWORKS
+    do
+      CONTAINERS=`docker container ls --filter=network=$NETWORK -q`
+      for CONTAINER in $CONTAINERS
+      do
+        docker container rm --force $CONTAINER
+      done
+      docker network rm $NETWORK
+    done
+  environment: "{{ item.config.cmgr_extra_environment_vars }}"
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Prune unused Docker images
   ansible.builtin.shell: docker image prune --all --force
   environment: "{{ cmgr_extra_environment_vars }}"
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Prune unused Docker images for multi mode instances
+  ansible.builtin.shell: docker image prune --all --force
+  environment: "{{ item.config.cmgr_extra_environment_vars }}"
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

@@ -27,3 +27,7 @@ artifact_server_backend: "selfhosted"
 artifact_server_other_options: ""
 artifact_server_extra_environment_vars: {}
 artifact_server_github_url: "https://github.com/picoCTF/cmgr-artifact-server"
+
+multi_mode_enabled: no
+multi_mode_config: {}
+multi_mode_include_unsuffixed: no
