@@ -51,12 +51,12 @@
   changed_when: true
   notify:
     - Restart cmgrd
-  when: installation_required or cmgrd_unit.changed and ((not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool))
+  when: (installation_required or cmgrd_unit.changed) and ((not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool))
 
 - name: Determine whether to restart suffixed cmgrd services
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:
     - Restart suffixed cmgrds
-  when: installation_required or cmgrd_suffixed_units.changed and (multi_mode_enabled | bool)
+  when: (installation_required or cmgrd_suffixed_units.changed) and (multi_mode_enabled | bool)
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

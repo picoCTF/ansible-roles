@@ -59,12 +59,12 @@
   changed_when: true
   notify:
     - Restart cmgr artifact server
-  when: artifact_server_installation_required or cmgr_artifact_server_unit.changed and ((not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool))
+  when: (artifact_server_installation_required or cmgr_artifact_server_unit.changed) and ((not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool))
 
 - name: Determine whether to restart suffixed cmgr artifact server services
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:
     - Restart suffixed cmgr artifact servers
-  when: artifact_server_installation_required or cmgr_artifact_server_suffixed_units.changed and (multi_mode_enabled | bool)
+  when: (artifact_server_installation_required or cmgr_artifact_server_suffixed_units.changed) and (multi_mode_enabled | bool)
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
