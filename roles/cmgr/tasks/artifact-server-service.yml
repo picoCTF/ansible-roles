@@ -8,6 +8,14 @@
     state: directory
     mode: "0770"
 
+- name: Ensure suffixed artifact directories exist and are root-only
+  ansible.builtin.file:
+    path: "{{ cmgr_artifact_dir }}/{{ item.suffix }}"
+    state: directory
+    mode: "0770"
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
+
 - name: Ensure artifact server systemd unit exists
   ansible.builtin.template:
     src: "cmgr_artifact_server.service.j2"
@@ -17,16 +25,46 @@
   register: cmgr_artifact_server_unit
   notify:
     - Reload systemd config
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Ensure suffixed artifact server systemd units exist
+  ansible.builtin.template:
+    src: "cmgr_artifact_server_suffixed.service.j2"
+    dest: "{{ systemd_unit_dir }}/cmgr_artifact_server_{{ item.suffix }}.service"
+    lstrip_blocks: yes
+    force: yes
+  register: cmgr_artifact_server_{{ item.suffix }}_unit
+  notify:
+    - Reload systemd config
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Ensure systemd unit is enabled
   ansible.builtin.systemd:
     name: cmgr_artifact_server.service
     daemon_reload: yes
     enabled: yes
+  when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
+
+- name: Ensure suffixed systemd units are enabled
+  ansible.builtin.systemd:
+    name: cmgr_artifact_server_{{ item.suffix }}.service
+    daemon_reload: yes
+    enabled: yes
+  when: multi_mode_enabled | bool
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Determine whether to restart cmgr artifact server
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:
     - Restart cmgr artifact server
-  when: artifact_server_installation_required or cmgr_artifact_server_unit.changed
+  when: artifact_server_installation_required or cmgr_artifact_server_unit.changed and ((not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool))
+
+- name: Determine whether to restart suffixed cmgr artifact server services
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart suffixed cmgr artifact servers
+  when: artifact_server_installation_required or cmgr_artifact_server{{ item.suffix }}_unit.changed and (multi_mode_enabled | bool)
+  loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

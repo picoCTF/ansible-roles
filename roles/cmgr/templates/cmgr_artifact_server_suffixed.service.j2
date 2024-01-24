@@ -1,0 +1,16 @@
+[Unit]
+Description=cmgr artifact server
+Documentation=https://github.com/picoCTF/cmgr-artifact-server
+ConditionArchitecture=x86-64
+ConditionPathIsDirectory={{ cmgr_artifact_dir }}/{{ item.suffix }}
+
+[Service]
+Type=exec
+Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}/{{ item.suffix }}"
+{% for key, value in item.config.artifact_server_extra_environment_vars.items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
+ExecStart={{ install_location }}/cmgr-artifact-server -b {{ artifact_server_backend }} {{ item.config.artifact_server_other_options }}
+
+[Install]
+WantedBy=multi-user.target

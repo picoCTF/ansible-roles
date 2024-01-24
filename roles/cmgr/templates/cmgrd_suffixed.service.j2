@@ -1,0 +1,35 @@
+[Unit]
+Description=cmgr daemon
+Documentation=https://github.com/ArmyCyberInstitute/cmgr
+Wants=docker.service
+After=docker.service
+ConditionArchitecture=x86-64
+ConditionPathIsDirectory={{ cmgr_dir }}
+
+[Service]
+Type=exec
+LimitNOFILE=49152
+Environment="CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_{{ item.suffix }}.db') }}"
+Environment="CMGR_DIR={{ cmgr_dir }}"
+Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}/{{ item.suffix }}"
+Environment="CMGR_LOGGING={{ cmgr_logging }}"
+Environment="CMGR_INTERFACE={{ cmgr_interface }}"
+{% if cmgr_registry %}
+Environment="CMGR_REGISTRY={{ cmgr_registry }}"
+{% endif %}
+{% if cmgr_registry_user %}
+Environment="CMGR_REGISTRY_USER={{ cmgr_registry_user }}"
+{% endif %}
+{% if cmgr_registry_token %}
+Environment="CMGR_REGISTRY_TOKEN={{ cmgr_registry_token }}"
+{% endif %}
+{% if cmgr_ports %}
+Environment="CMGR_PORTS={{ cmgr_ports }}"
+{% endif %}
+{% for key, value in item.config.cmgr_extra_environment_vars.items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
+ExecStart={{ install_location }}/cmgrd --port {{ item.config.cmgrd_port }}
+
+[Install]
+WantedBy=multi-user.target

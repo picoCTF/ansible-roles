@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e -o pipefail
+
+export CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_{{ item.suffix }}.db') }}
+export CMGR_DIR={{ cmgr_dir }}
+export CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}/{{ item.suffix }}
+export CMGR_LOGGING={{ cmgr_logging }}
+export CMGR_INTERFACE={{ cmgr_interface }}
+{% if cmgr_registry %}
+export CMGR_REGISTRY={{ cmgr_registry }}
+{% endif %}
+{% if cmgr_registry_user %}
+export CMGR_REGISTRY_USER={{ cmgr_registry_user }}
+{% endif %}
+{% if cmgr_registry_token %}
+export CMGR_REGISTRY_TOKEN={{ cmgr_registry_token }}
+{% endif %}
+{% if cmgr_ports %}
+export CMGR_PORTS={{ cmgr_ports }}
+{% endif %}
+{% if cmgr_enable_disk_quotas %}
+export CMGR_ENABLE_DISK_QUOTAS={{ cmgr_enable_disk_quotas }}
+{% endif %}
+{% for key, value in item.config.cmgr_extra_environment_vars.items() %}
+export {{ key }}={{ value }}
+{% endfor %}
+
+{{ install_location }}/cmgr_bin "$@"
