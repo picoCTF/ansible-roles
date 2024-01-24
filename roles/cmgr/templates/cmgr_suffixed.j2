@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -o pipefail
 
-export CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_{{ item.suffix }}.db') }}
+export CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_') }}{{ item.suffix }}.db
 export CMGR_DIR={{ cmgr_dir }}
 export CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}/{{ item.suffix }}
 export CMGR_LOGGING={{ cmgr_logging }}

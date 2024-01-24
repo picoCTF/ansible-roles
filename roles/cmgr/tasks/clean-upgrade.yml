@@ -55,7 +55,7 @@
 
 - name: Remove suffixed cmgr databases
   ansible.builtin.file:
-    path: "{{ cmgr_db | replace('cmgr.db', 'cmgr_{{ item.suffix }}.db') }}"
+    path: "{{ cmgr_db | replace('cmgr.db', 'cmgr_') }}{{ item.suffix }}.db"
     state: absent
   when: multi_mode_enabled | bool
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

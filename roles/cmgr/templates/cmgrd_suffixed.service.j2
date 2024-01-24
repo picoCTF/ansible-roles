@@ -9,7 +9,7 @@ ConditionPathIsDirectory={{ cmgr_dir }}
 [Service]
 Type=exec
 LimitNOFILE=49152
-Environment="CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_{{ item.suffix }}.db') }}"
+Environment="CMGR_DB={{ cmgr_db | replace('cmgr.db', 'cmgr_') }}{{ item.suffix }}.db"
 Environment="CMGR_DIR={{ cmgr_dir }}"
 Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}/{{ item.suffix }}"
 Environment="CMGR_LOGGING={{ cmgr_logging }}"
