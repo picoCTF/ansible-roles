@@ -25,7 +25,7 @@
     dest: "{{ systemd_unit_dir }}/cmgrd_{{ item.suffix }}.service"
     lstrip_blocks: yes
     force: yes
-  register: cmgrd_{{ item.suffix }}_unit
+  register: "cmgrd_suffixed_units"
   notify:
     - Reload systemd config
   when: multi_mode_enabled | bool
@@ -58,5 +58,5 @@
   changed_when: true
   notify:
     - Restart suffixed cmgrds
-  when: installation_required or cmgrd_{{ item.suffix }}_unit.changed and (multi_mode_enabled | bool)
+  when: installation_required or cmgrd_suffixed_units.changed and (multi_mode_enabled | bool)
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

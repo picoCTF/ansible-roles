@@ -33,7 +33,7 @@
     dest: "{{ systemd_unit_dir }}/cmgr_artifact_server_{{ item.suffix }}.service"
     lstrip_blocks: yes
     force: yes
-  register: cmgr_artifact_server_{{ item.suffix }}_unit
+  register: "cmgr_artifact_server_suffixed_units"
   notify:
     - Reload systemd config
   when: multi_mode_enabled | bool
@@ -66,5 +66,5 @@
   changed_when: true
   notify:
     - Restart suffixed cmgr artifact servers
-  when: artifact_server_installation_required or cmgr_artifact_server{{ item.suffix }}_unit.changed and (multi_mode_enabled | bool)
+  when: artifact_server_installation_required or cmgr_artifact_server_suffixed_units.changed and (multi_mode_enabled | bool)
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
