@@ -1,0 +1,13 @@
+[Unit]
+Description=docker-reaper
+Documentation=https://github.com/picoCTF/docker-reaper
+Wants=docker.service
+After=docker.service
+ConditionArchitecture=x86-64
+
+[Service]
+Type=exec
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_command }}
+
+[Install]
+WantedBy=multi-user.target

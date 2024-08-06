@@ -48,6 +48,12 @@
     apply:
       become: yes
 
+- include_tasks: docker-reaper.yml
+  when: docker_reaper_enabled | bool
+  args:
+    apply:
+      become: yes
+
 - ansible.builtin.meta: flush_handlers
 
 - name: Ensure Docker service is active

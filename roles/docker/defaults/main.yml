@@ -26,3 +26,9 @@ logs_max_size: "10m"
 logs_max_files: 3
 
 container_deny_ipv4_cidrs: ["169.254.169.254/32"]
+
+docker_reaper_enabled: yes
+docker_reaper_version: "latest"
+docker_reaper_upgrade: no
+docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks"
+docker_reaper_interval_secs: 60

@@ -13,6 +13,7 @@ client_key_path: "{{ tls_cert_path }}/key.pem"
 client_csr_path: "{{ tls_cert_path }}/cert.csr"
 client_cert_path: "{{ tls_cert_path }}/cert.pem"
 
+systemd_unit_dir: "/etc/systemd/system/"
 systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"
 systemd_ufw_drop_in_dir: "/etc/systemd/system/ufw.service.d"
 
@@ -24,3 +25,7 @@ parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
 oci_interceptor_install_path: "/usr/local/bin"
 oci_interceptor_github_url: "https://github.com/picoCTF/oci-interceptor"
 oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.gz"
+
+docker_reaper_install_path: "/usr/local/bin"
+docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"
+docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"

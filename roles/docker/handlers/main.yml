@@ -23,3 +23,15 @@
   community.general.ufw:
     state: reloaded
   become: yes
+
+- name: Restart docker-reaper service unit
+  ansible.builtin.service:
+    name: docker_reaper.service
+    state: restarted
+  become: yes
+
+- name: Restart docker-reaper timer unit
+  ansible.builtin.service:
+    name: docker_reaper.timer
+    state: restarted
+  become: yes

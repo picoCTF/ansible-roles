@@ -1,0 +1,13 @@
+[Unit]
+Description="docker-reaper timer"
+Wants=docker.service
+After=docker.service
+ConditionArchitecture=x86-64
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec={{ docker_reaper_interval_secs }}
+Unit=docker_reaper.service
+
+[Install]
+WantedBy=multi-user.target
