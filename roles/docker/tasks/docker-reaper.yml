@@ -1,0 +1,105 @@
+---
+
+# Install docker-reaper and set up systemd service
+
+- name: Check whether docker-reaper is installed
+  ansible.builtin.stat:
+    path: "{{ docker_reaper_install_path }}/docker-reaper"
+  register: docker_reaper_binary
+
+- name: Determine installed docker-reaper version
+  ansible.builtin.command:
+    cmd: echo "v`{{ docker_reaper_install_path }}/docker-reaper --version | cut -d ' ' -f 2,2`"
+  when: (docker_reaper_upgrade | bool) and docker_reaper_binary.stat.exists
+  register: docker_reaper_version_output
+
+- name: Determine latest docker-reaper version
+  ansible.builtin.uri:
+    url: "{{ docker_reaper_github_url }}/releases/latest"
+    method: HEAD
+    follow_redirects: safe
+  register: docker_reaper_latest_version_response
+  when: docker_reaper_version == "latest" and (not docker_reaper_binary.stat.exists or (docker_reaper_upgrade | bool))
+
+- name: Determine whether (re-)installation is necessary
+  ansible.builtin.set_fact:
+    docker_reaper_installation_required: "{{ (not docker_reaper_binary.stat.exists) or ((docker_reaper_upgrade | bool) and docker_reaper_version != 'latest' and docker_reaper_version_output.stdout != docker_reaper_version) or ((docker_reaper_upgrade | bool) and docker_reaper_version == 'latest' and docker_reaper_version_output.stdout != docker_reaper_latest_version_response.url.split('/tag/')[1]) }}"
+
+- name: Create temporary directory for download
+  ansible.builtin.tempfile:
+    state: directory
+  register: docker_reaper_download_dir
+  when: docker_reaper_installation_required
+
+- name: Download docker-reaper binary
+  ansible.builtin.get_url:
+    dest: "{{ docker_reaper_download_dir.path }}"
+    url: "{{ docker_reaper_github_url }}/releases/download/{{ docker_reaper_latest_version_response.url.split('/tag/')[1] if docker_reaper_version == 'latest' else docker_reaper_version }}/{{ docker_reaper_binary_filename }}"
+  when: docker_reaper_installation_required
+
+- name: Unpack docker-reaper binary
+  ansible.builtin.unarchive:
+    dest: "{{ docker_reaper_download_dir.path }}"
+    remote_src: yes
+    src: "{{ docker_reaper_download_dir.path }}/{{ docker_reaper_binary_filename }}"
+  when: docker_reaper_installation_required
+
+- name: Copy docker-reaper binary to install location
+  ansible.builtin.copy:
+    src: "{{ docker_reaper_download_dir.path }}/docker-reaper"
+    dest: "{{ docker_reaper_install_path }}"
+    mode: "0755"
+    remote_src: yes
+  when: docker_reaper_installation_required
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ docker_reaper_download_dir.path }}"
+    state: absent
+  when: docker_reaper_installation_required
+
+- name: Ensure docker_reaper.service systemd unit exists
+  ansible.builtin.template:
+    src: "docker_reaper.service.j2"
+    dest: "{{ systemd_unit_dir }}/docker_reaper.service"
+    lstrip_blocks: yes
+    force: yes
+  register: docker_reaper_service_unit
+  notify:
+    - Reload systemd config
+
+- name: Ensure docker_reaper.service unit is enabled
+  ansible.builtin.systemd:
+    name: docker_reaper.service
+    daemon_reload: yes
+    enabled: yes
+
+- name: Ensure docker_reaper.timer systemd unit exists
+  ansible.builtin.template:
+    src: "docker_reaper.timer.j2"
+    dest: "{{ systemd_unit_dir }}/docker_reaper.timer"
+    lstrip_blocks: yes
+    force: yes
+  register: docker_reaper_timer_unit
+  notify:
+    - Reload systemd config
+
+- name: Ensure docker_reaper.timer unit is enabled
+  ansible.builtin.systemd:
+    name: docker_reaper.timer
+    daemon_reload: yes
+    enabled: yes
+
+- name: Determine whether to restart the docker_reaper.service unit
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart docker-reaper service unit
+  when: (docker_reaper_installation_required or docker_reaper_service_unit.changed)
+
+- name: Determine whether to restart the docker_reaper.timer unit
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart docker-reaper timer unit
+  when: docker_reaper_timer_unit.changed

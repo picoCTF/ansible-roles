@@ -123,6 +123,10 @@ Access to the [EC2 metadata endpoint](https://docs.aws.amazon.com/AWSEC2/latest/
 
 This is [configurable](#firewall-settings), and additional IPs can be blocked if desired.
 
+## Docker resource reaper
+
+[docker-reaper](https://github.com/picoCTF/oci-interceptor) is integrated as a systemd service. By default, it will run every minute, removing any on-demand cmgr containers and networks which are more than an hour old. This can be disabled or customized via [role variables](#docker-reaper-settings).
+
 ## Role Variables
 
 ### General settings
@@ -184,3 +188,13 @@ This is [configurable](#firewall-settings), and additional IPs can be blocked if
 | Name | Description | Default |
 | --- | --- | --- |
 | `container_deny_ipv4_cidrs` | Traffic to these IPv4 CIDRs from inside any container is rejected. | `["169.254.169.254/32"]` |
+
+### docker-reaper settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `docker_reaper_enabled` | Whether to run `docker-reaper` as a scheduled systemd service. | `yes` |
+| `docker_reaper_version` | The version of `docker-reaper` to run. | `latest` |
+| `docker_reaper_upgrade` | Whether to upgrade `docker-reaper` if already installed. | `no` |
+| `docker_reaper_command` | Command-line arguments to pass to `docker-reaper`. | `containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks` |
+| `docker_reaper_interval_secs` | How frequently (in seconds) to run the specified `docker-reaper` command. | `60` |
