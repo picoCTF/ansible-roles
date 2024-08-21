@@ -1,8 +1,4 @@
 ---
-- name: Reboot
-  ansible.builtin.reboot:
-  become: yes
-
 - name: Restart journald
   ansible.builtin.service:
     name: systemd-journald

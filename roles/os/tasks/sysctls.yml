@@ -7,4 +7,3 @@
     state: present
     sysctl_set: yes
   when: ephemeral_port_range
-  notify: Reboot
