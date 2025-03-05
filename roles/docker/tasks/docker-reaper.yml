@@ -8,7 +8,7 @@
   register: docker_reaper_binary
 
 - name: Determine installed docker-reaper version
-  ansible.builtin.command:
+  ansible.builtin.shell:
     cmd: echo "v`{{ docker_reaper_install_path }}/docker-reaper --version | cut -d ' ' -f 2,2`"
   when: (docker_reaper_upgrade | bool) and docker_reaper_binary.stat.exists
   register: docker_reaper_version_output
