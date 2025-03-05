@@ -47,7 +47,7 @@
 - name: Copy oci-interceptor binary to install location
   ansible.builtin.copy:
     src: "{{ oci_interceptor_download_dir.path }}/oci-interceptor"
-    dest: "{{ oci_interceptor_install_path }}"
+    dest: "{{ oci_interceptor_install_path }}/oci-interceptor"
     mode: "0755"
     remote_src: yes
   when: oci_interceptor_installation_required

@@ -44,15 +44,20 @@
     src: "{{ download_dir.path }}/{{ cmgr_binaries_filename }}"
   when: installation_required
 
-- name: Copy cmgr binaries to install location
+- name: Copy cmgr binary to install location
   ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ install_location }}"
+    src: "{{ download_dir.path }}/cmgr"
+    dest: "{{ install_location }}/cmgr"
     mode: "0755"
     remote_src: yes
-  with_items:
-    - "{{ download_dir.path }}/cmgr"
-    - "{{ download_dir.path }}/cmgrd"
+  when: installation_required
+
+- name: Copy cmgrd binary to install location
+  ansible.builtin.copy:
+    src: "{{ download_dir.path }}/cmgrd"
+    dest: "{{ install_location }}/cmgrd"
+    mode: "0755"
+    remote_src: yes
   when: installation_required
 
 - name: Download example challenges

@@ -47,7 +47,7 @@
 - name: Copy cmgr-artifact-server binary to install location
   ansible.builtin.copy:
     src: "{{ artifact_server_download_dir.path }}/cmgr-artifact-server"
-    dest: "{{ install_location }}"
+    dest: "{{ install_location }}/cmgr-artifact-server"
     mode: "0755"
     remote_src: yes
   when: artifact_server_installation_required
