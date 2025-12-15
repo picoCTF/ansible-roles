@@ -22,15 +22,33 @@
   ansible.builtin.apt_repository:
     repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
 
-- name: Ensure Docker Engine is installed
+# Pinned packages
+- name: Ensure Docker Engine is pinned to 28.5.2 (last < 29)
   ansible.builtin.apt:
     name:
-      - docker-ce
-      - docker-ce-cli
+      - docker-ce=5:28.5.2-1~ubuntu.22.04~jammy
+      - docker-ce-cli=5:28.5.2-1~ubuntu.22.04~jammy
+    state: present
+    allow_downgrade: yes
+    update_cache: yes
+  notify:
+    - Restart Docker
+
+- name: Hold Docker packages at current version
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - docker-ce
+    - docker-ce-cli
+
+# Other unpinned
+- name: Ensure Docker plugins and containerd are installed
+  ansible.builtin.apt:
+    name:
       - containerd.io
       - docker-buildx-plugin
       - docker-compose-plugin
     state: "{{ 'latest' if (upgrade | bool) else 'present' }}"
-    update_cache: yes
   notify:
     - Restart Docker
