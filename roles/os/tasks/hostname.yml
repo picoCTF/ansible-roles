@@ -3,4 +3,3 @@
 - name: Set hostname
   ansible.builtin.hostname:
     name: "{{ hostname }}"
-  when: hostname is defined

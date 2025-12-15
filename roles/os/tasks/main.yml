@@ -17,7 +17,7 @@
       become: yes
 
 - include_tasks: hostname.yml
-  when: hostname is defined
+  when: hostname | default(None) is not none
   args:
     apply:
       become: yes
