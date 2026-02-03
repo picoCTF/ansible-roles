@@ -29,3 +29,7 @@ oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.g
 docker_reaper_install_path: "/usr/local/bin"
 docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"
 docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"
+
+docker_version_pin_map:
+  jammy: "5:28.5.2-1~ubuntu.22.04~jammy"
+  noble: "5:28.5.2-1~ubuntu.24.04~noble"
