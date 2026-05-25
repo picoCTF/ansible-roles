@@ -1,0 +1,19 @@
+---
+
+# Configure needrestart to run non-interactively so apt operations don't hang.
+# needrestart is installed by default on Noble; not present on Jammy.
+
+- name: Ensure needrestart drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/needrestart/conf.d
+    state: directory
+    mode: '0755'
+
+- name: Configure needrestart for non-interactive apt runs
+  ansible.builtin.copy:
+    dest: /etc/needrestart/conf.d/50-ansible.conf
+    content: |
+      # Managed by Ansible.
+      $nrconf{restart} = 'a';
+      $nrconf{kernelhints} = 0;
+    mode: '0644'

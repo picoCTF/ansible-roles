@@ -3,17 +3,11 @@
 # Generate TLS keys and certificates
 # (Based on https://docs.docker.com/engine/security/protect-access/#use-tls-https-to-protect-the-docker-daemon-socket)
 
-- name: Ensure pip is installed  # pip is required to install `cryptography` (community.crypto dependency)
-  ansible.builtin.apt:
-    name: python3-pip
-    state: present
-    update_cache: yes
-
 - name: Ensure cryptography is installed  # community.crypto collection dependency
-  ansible.builtin.pip:
-    name: cryptography
+  ansible.builtin.apt:
+    name: python3-cryptography
     state: "{{ 'latest' if ((upgrade | bool) or (tls_renew_certs | bool)) else 'present' }}"
-    break_system_packages: yes  # not a best practice, but install in system Python environment (TODO: use venv when running Ansible?)
+    update_cache: yes
 
 - name: Ensure Docker TLS certificate directory exists
   ansible.builtin.file:
