@@ -2,6 +2,8 @@
 docker_group_users: []
 upgrade: no
 
+docker_pin_version: false
+
 tls_access: yes
 tls_expiration_days: 3650
 tls_sans: ["DNS:localhost", "IP:127.0.0.1", "DNS:host.docker.internal"]

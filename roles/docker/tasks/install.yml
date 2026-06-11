@@ -25,21 +25,38 @@
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
 
+- name: Ensure docker.list is removed to clear any conflicting repository configurations
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+
 - name: Ensure stable Docker repository is added
   ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+    filename: docker
+    state: present
+
+- name: Ensure Docker packages are unheld
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop:
+    - docker-ce
+    - docker-ce-cli
+  when: not (docker_pin_version | bool)
 
 # Pinned packages
-- name: Ensure Docker Engine is pinned to 28.5.2 (last < 29)
+- name: Ensure Docker Engine is pinned to specific version
   ansible.builtin.apt:
     name:
-      - "docker-ce={{ docker_version_pin_map[ansible_distribution_release] }}"
-      - "docker-ce-cli={{ docker_version_pin_map[ansible_distribution_release] }}"
+      - "docker-ce={{ docker_version_pin_map[ansible_facts['distribution_release']] }}"
+      - "docker-ce-cli={{ docker_version_pin_map[ansible_facts['distribution_release']] }}"
     state: present
     allow_downgrade: yes
     update_cache: yes
   notify:
     - Restart Docker
+  when: (docker_pin_version | bool)
 
 - name: Hold Docker packages at current version
   ansible.builtin.dpkg_selections:
@@ -48,6 +65,17 @@
   loop:
     - docker-ce
     - docker-ce-cli
+  when: (docker_pin_version | bool)
+
+- name: Ensure Docker Engine is installed (unpinned)
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+    state: "{{ 'latest' if (upgrade | bool) else 'present' }}"
+  notify:
+    - Restart Docker
+  when: not (docker_pin_version | bool)
 
 # Other unpinned
 - name: Ensure Docker plugins and containerd are installed
