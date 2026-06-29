@@ -36,6 +36,10 @@
     filename: docker
     state: present
 
+- name: Gather installed package facts
+  ansible.builtin.package_facts:
+    manager: apt
+
 - name: Ensure Docker packages are unheld
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
@@ -43,7 +47,9 @@
   loop:
     - docker-ce
     - docker-ce-cli
-  when: not (docker_pin_version | bool)
+  when:
+    - not (docker_pin_version | bool)
+    - item in ansible_facts.packages
 
 # Pinned packages
 - name: Ensure Docker Engine is pinned to specific version
