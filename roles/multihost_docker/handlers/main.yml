@@ -1,0 +1,43 @@
+---
+- name: Update GRUB
+  ansible.builtin.command:
+    cmd: update-grub
+  become: yes
+
+- name: Reboot
+  ansible.builtin.reboot:
+  become: yes
+
+- name: Reload systemd config
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Restart Docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  become: yes
+
+- name: Reload ufw
+  community.general.ufw:
+    state: reloaded
+  become: yes
+
+- name: Restart docker-reaper service unit
+  ansible.builtin.service:
+    name: docker_reaper.service
+    state: restarted
+  become: yes
+
+- name: Restart docker-reaper timer unit
+  ansible.builtin.service:
+    name: docker_reaper.timer
+    state: restarted
+  become: yes
+
+- name: Restart telemetry service
+  ansible.builtin.service:
+    name: telemetry.service
+    state: restarted
+  become: yes

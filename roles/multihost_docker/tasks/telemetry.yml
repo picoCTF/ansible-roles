@@ -1,0 +1,49 @@
+---
+
+# Install the cork-telemetry health agent and its systemd unit.
+#
+# cmgrd polls http://<worker>:2136/health every 500ms and expects a 200 with a
+# JSON body {"overloaded": <bool>} (cmgr/workers.go pollTelemetry). The endpoint
+# is plain HTTP by design — it carries no secret and needs no TLS — so there are
+# no certs to deploy here.
+#
+# The release binary is a single static executable (no tarball). Until
+# CyLabAcademy/cork-telemetry publishes a public asset URL, `cork_telemetry_download_url`
+# is a placeholder; set it (and optionally `cork_telemetry_checksum`) to install.
+
+- name: Assert a telemetry download URL is configured
+  ansible.builtin.assert:
+    that:
+      - cork_telemetry_download_url is defined
+      - cork_telemetry_download_url | length > 0
+      - cork_telemetry_download_url != "REPLACE_ME"
+    fail_msg: >-
+      cork_telemetry_download_url is unset (placeholder). Point it at the
+      cork-telemetry {{ cork_telemetry_version }} `telemetry` binary asset, or set
+      cork_telemetry_enabled: no to skip telemetry.
+
+- name: Download cork-telemetry binary
+  ansible.builtin.get_url:
+    url: "{{ cork_telemetry_download_url }}"
+    dest: "{{ cork_telemetry_install_path }}/telemetry"
+    mode: "0755"
+  notify:
+    - Restart telemetry service
+
+- name: Ensure telemetry.service systemd unit exists
+  ansible.builtin.template:
+    src: "telemetry.service.j2"
+    dest: "{{ systemd_unit_dir }}/telemetry.service"
+    lstrip_blocks: yes
+    force: yes
+  register: telemetry_service_unit
+  notify:
+    - Reload systemd config
+    - Restart telemetry service
+
+- name: Ensure telemetry.service unit is enabled and started
+  ansible.builtin.systemd:
+    name: telemetry.service
+    daemon_reload: yes
+    enabled: yes
+    state: started
