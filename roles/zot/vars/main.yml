@@ -1,0 +1,6 @@
+---
+zot_install_path: "/usr/bin/zot"
+zot_config_dir: "/etc/zot"
+zot_download_url: "https://github.com/project-zot/zot/releases/download/{{ zot_version }}/zot-linux-amd64"
+
+systemd_unit_dir: "/etc/systemd/system/"

@@ -1,0 +1,13 @@
+---
+zot_version: "v2.1.18"
+zot_upgrade: no
+zot_checksum: ""
+
+zot_service_enabled: yes
+zot_address: "0.0.0.0"
+zot_port: "5000"
+zot_storage_root: "/var/lib/zot"
+zot_log_level: "warning"
+
+zot_deploy_certs: yes
+zot_cert_src: "./docker-certs"

@@ -1,0 +1,19 @@
+---
+
+# Install the zot registry binary (upstream release — a single static executable).
+
+- name: Ensure zot config directory exists
+  ansible.builtin.file:
+    path: "{{ zot_config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Download zot binary
+  ansible.builtin.get_url:
+    url: "{{ zot_download_url }}"
+    dest: "{{ zot_install_path }}"
+    mode: "0755"
+    force: "{{ zot_upgrade | bool }}"
+    checksum: "{{ zot_checksum | default('') | ternary(zot_checksum, omit) }}"
+  notify:
+    - Restart zot

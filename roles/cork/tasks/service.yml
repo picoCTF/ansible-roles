@@ -1,0 +1,32 @@
+---
+
+# Configure cmgrd to run as a systemd service.
+
+- name: Ensure challenge directory exists and is root-only
+  ansible.builtin.file:
+    path: "{{ cmgr_dir }}"
+    state: directory
+    mode: "0770"
+
+- name: Ensure cmgrd systemd unit exists
+  ansible.builtin.template:
+    src: "cmgrd.service.j2"
+    dest: "{{ systemd_unit_dir }}/cmgrd.service"
+    lstrip_blocks: yes
+    force: yes
+  register: cmgrd_unit
+  notify:
+    - Reload systemd config
+
+- name: Ensure systemd unit is enabled
+  ansible.builtin.systemd:
+    name: cmgrd.service
+    daemon_reload: yes
+    enabled: yes
+
+- name: Determine whether to restart the cmgrd service
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart cmgrd
+  when: installation_required or cmgrd_unit.changed

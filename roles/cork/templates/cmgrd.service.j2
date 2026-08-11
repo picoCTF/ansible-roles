@@ -1,0 +1,44 @@
+[Unit]
+Description=cmgr daemon
+Documentation=https://github.com/picoCTF/cmgr
+Wants=docker.service
+After=docker.service
+ConditionArchitecture=x86-64
+ConditionPathIsDirectory={{ cmgr_dir }}
+
+[Service]
+Type=exec
+LimitNOFILE=49152
+Environment="CMGR_DB={{ cmgr_db }}"
+Environment="CMGR_DIR={{ cmgr_dir }}"
+Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}"
+Environment="CMGR_LOGGING={{ cmgr_logging }}"
+Environment="DOCKER_CERT_PATH={{ docker_cert_path }}"
+{% if cmgr_registry %}
+Environment="CMGR_REGISTRY={{ cmgr_registry }}"
+{% endif %}
+{% if cmgr_registry_cert_dir %}
+Environment="CMGR_REGISTRY_CERT_DIR={{ cmgr_registry_cert_dir }}"
+{% endif %}
+{% if cmgr_ports %}
+Environment="CMGR_PORTS={{ cmgr_ports }}"
+{% endif %}
+{% if cmgr_concurrent_launches %}
+Environment="CMGR_CONCURRENT_LAUNCHES={{ cmgr_concurrent_launches }}"
+{% endif %}
+{% if cmgr_prune_age %}
+Environment="CMGR_PRUNE_AGE={{ cmgr_prune_age }}"
+{% endif %}
+{% if cmgr_db_wal is not none %}
+Environment="CMGR_DB_WAL={{ cmgr_db_wal }}"
+{% endif %}
+{% if cmgr_enable_disk_quotas %}
+Environment="CMGR_ENABLE_DISK_QUOTAS={{ cmgr_enable_disk_quotas }}"
+{% endif %}
+{% for key, value in cmgr_extra_environment_vars.items() %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
+ExecStart={{ install_location }}/cmgrd
+
+[Install]
+WantedBy=multi-user.target

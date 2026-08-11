@@ -1,0 +1,42 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": {
+    "rootDirectory": "{{ zot_storage_root }}"
+  },
+  "http": {
+    "address": "{{ zot_address }}",
+    "port": "{{ zot_port }}",
+    "compat": ["docker2s2"],
+    "tls": {
+      "cert": "{{ zot_config_dir }}/zot-server-cert.pem",
+      "key": "/run/credentials/zot.service/zot-server-key.pem",
+      "cacert": "{{ zot_config_dir }}/zot-ca-cert.pem"
+    },
+    "auth": {
+      "mtls": {
+        "identityAttributes": ["CommonName"]
+      }
+    },
+    "accessControl": {
+      "repositories": {
+        "**": {
+          "policies": [
+            {
+              "users": ["cmgr"],
+              "actions": ["read", "create", "update", "delete"]
+            },
+            {
+              "users": ["worker"],
+              "actions": ["read"]
+            }
+          ],
+          "defaultPolicy": [],
+          "anonymousPolicy": []
+        }
+      }
+    }
+  },
+  "log": {
+    "level": "{{ zot_log_level }}"
+  }
+}

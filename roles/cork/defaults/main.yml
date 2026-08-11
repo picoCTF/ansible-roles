@@ -1,0 +1,31 @@
+---
+version: "latest"
+upgrade: no
+clean_upgrade: no
+cork_github_url: "REPLACE_ME"
+
+cork_deploy_certs: yes
+cork_cert_src: "./docker-certs"
+docker_cert_path: "/root/.docker_certs"
+cmgr_registry: "1.2.3.4:5000"
+
+cmgrd_service_enabled: yes
+cmgr_db: "{{ challenge_dir }}/cmgr.db"
+cmgr_dir: "{{ challenge_dir }}"
+cmgr_artifact_dir: "{{ challenge_dir }}"
+cmgr_logging: "warn"
+cmgr_registry_cert_dir: null
+cmgr_ports: null
+cmgr_concurrent_launches: null
+cmgr_prune_age: null
+cmgr_db_wal: null
+cmgr_enable_disk_quotas: null
+cmgr_extra_environment_vars: {}
+
+artifact_server_version: "latest"
+artifact_server_upgrade: no
+artifact_server_service_enabled: yes
+artifact_server_backend: "selfhosted"
+artifact_server_other_options: ""
+artifact_server_extra_environment_vars: {}
+artifact_server_github_url: "https://github.com/picoCTF/cmgr-artifact-server"

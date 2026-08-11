@@ -1,0 +1,28 @@
+[Unit]
+Description=zot OCI image registry
+Documentation=https://zotregistry.dev
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={{ zot_install_path }} serve {{ zot_config_dir }}/config.json
+Restart=always
+RestartSec=1
+
+# Port 5000 is unprivileged; zot only needs to read /etc/zot and
+# write its image store, so it runs as a dedicated locked-down user.
+DynamicUser=yes
+StateDirectory=zot
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=yes
+LoadCredential=zot-server-key.pem:{{ zot_config_dir }}/zot-server-key.pem
+
+[Install]
+WantedBy=multi-user.target
