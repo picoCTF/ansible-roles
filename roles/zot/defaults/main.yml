@@ -1,6 +1,5 @@
 ---
 zot_version: "v2.1.18"
-zot_upgrade: no
 zot_checksum: ""
 
 zot_service_enabled: yes

@@ -61,8 +61,7 @@ secret and needs no TLS — so no certificates are deployed for it.
 > **Placeholder download.** CyLabAcademy/cork-telemetry has no public release asset URL
 > yet, so `cork_telemetry_download_url` defaults to `REPLACE_ME` and the role will fail
 > fast until you set it (or set `cork_telemetry_enabled: no`). Point it at the
-> `telemetry` binary asset and optionally pin `cork_telemetry_checksum`. See
-> [settings](#cork-telemetry-settings).
+> `telemetry` binary asset. See [settings](#cork-telemetry-settings).
 
 ## Inherited Docker configuration
 
@@ -74,9 +73,9 @@ documentation for the full rationale.
 - **cgroup parent limits** — a `limit_docker.slice` caps combined container CPU/memory to
   80% of the host, with memory + swap accounting enabled.
 - **More Docker networks** — the default address-pool subnet size is set so thousands of
-  isolated per-instance networks are available. This role defaults
-  `network_prefix_length` to **26** (vs the generic role's 29) to match cork's worker
-  daemon config, giving larger per-instance subnets while still leaving ample networks.
+  isolated per-instance networks are available. At the default `network_prefix_length` of
+  29 each network holds up to 5 containers; lower it to host challenges that run more
+  containers than that per instance.
 - **User-namespace remapping** — UID 0 in containers maps to an unprivileged host UID
   (`userns_remap_enabled`).
 - **OCI runtime** — the [oci-interceptor](https://github.com/picoCTF/oci-interceptor)
@@ -88,10 +87,16 @@ documentation for the full rationale.
 ## Docker resource reaper
 
 [docker-reaper](https://github.com/picoCTF/docker-reaper) is installed and enabled as a
-systemd service + timer. By default it runs every minute, removing on-demand cmgr
-containers and networks (`label=cmgr.dynamic=true`) more than an hour old — this keeps a
-busy worker clean of finished challenge instances. Configurable via
+systemd service + timer. By default it runs every minute and does two sweeps: it removes
+on-demand cmgr containers and networks (`label=cmgr.dynamic=true`) more than an hour old,
+keeping a busy worker clean of finished challenge instances, and then evicts unused images
+once the image store's filesystem passes 80% full, down to 70%. Configurable via
 [role variables](#docker-reaper-settings).
+
+Image eviction is safe under cork's registry design: an evicted image is at worst a re-pull
+from zot on the next placement. Container cleanup also backstops cork itself — a worker
+purged with `worker-remove`, or orphaned by a `clean_upgrade` on the orchestrator, leaves its
+containers running, and this sweep is what reclaims them.
 
 ## Usage
 
@@ -128,14 +133,19 @@ not need to set it in your play.
 | --- | --- | --- |
 | `docker_group_users` | Adds these users to the `docker` group, granting daemon access without `sudo`. | `[]` |
 | `upgrade` | Whether to upgrade Docker packages if already installed. | `false` |
+| `docker_pin_version` | Pin `docker-ce`/`docker-ce-cli` to the version in `vars/main.yml`'s `docker_version_pin_map` and hold them, instead of tracking the repo. The map covers only `jammy` and `noble` — enabling this on any other release fails. | `false` |
+
+This role gathers facts (`ansible_processor_nproc`, `ansible_facts['distribution_release']`), so
+plays including it must not set `gather_facts: no`.
 
 ### TLS material settings
 
 | Name | Description | Default |
 | --- | --- | --- |
 | `tls_access` | Whether the Docker daemon is exposed over TLS on 2376. Required for cork. | `true` |
+| `tls_cert_path` | On-host directory holding the dockerd server material; `daemon.json` points `--tlscacert`/`--tlscert`/`--tlskey` here. A `/root` subdir keeps it unreadable to a non-root container escapee. | `/root/.docker_certs` |
 | `multihost_docker_cert_src` | Path **on the Ansible controller** holding the six leaf files from `gen-docker-certs.sh` (`docker-ca-cert.pem`, `docker-server-cert.pem`, `docker-server-key.pem`, `zot-ca-cert.pem`, `zot-worker-cert.pem`, `zot-worker-key.pem`). | `./docker-certs` |
-| `multihost_docker_registry` | zot registry address (`host:port`). Also the `/etc/docker/certs.d/<dir>` name and must match `CMGR_REGISTRY` on the orchestrator. | `10.12.34.121:5000` |
+| `multihost_docker_registry` | zot registry address (`host:port`). Also the `/etc/docker/certs.d/<dir>` name and must match `CMGR_REGISTRY` on the orchestrator. **Placeholder** — the default is not a real registry. | `1.2.3.4:5000` |
 
 ### cork-telemetry settings
 
@@ -143,17 +153,18 @@ not need to set it in your play.
 | --- | --- | --- |
 | `cork_telemetry_enabled` | Whether to install and run the cork-telemetry health agent. | `yes` |
 | `cork_telemetry_version` | Release tag of cork-telemetry (informational; used in messages). | `v0.0.1` |
-| `cork_telemetry_download_url` | URL of the `telemetry` binary asset. **Placeholder** `REPLACE_ME` until a public URL exists — the role fails fast if left unset while telemetry is enabled. | `REPLACE_ME` |
-| `cork_telemetry_checksum` | Optional checksum for the download, e.g. `sha256:f65d6089…a202a8`. Empty means unchecked. | `""` |
-| `cork_telemetry_args` | Extra arguments passed to the `telemetry` binary. | `""` |
+| `cork_telemetry_download_url` | URL of the `telemetry` binary asset. **Placeholder** `REPLACE_ME` until a public URL exists — the role fails fast if left unset while telemetry is enabled. The download is not checksum-verified. Changing this URL reinstalls the agent: the role records each install's source in `/etc/cork-telemetry/.installed-source` and compares against it, since the agent exposes no version flag. | `REPLACE_ME` |
 
 ### Firewall settings
 
 | Name | Description | Default |
 | --- | --- | --- |
 | `container_deny_ipv4_cidrs` | Traffic to these IPv4 CIDRs from inside any container is rejected. | `["169.254.169.254/32"]` |
-| `multihost_docker_restrict_ports` | If `yes`, add explicit ufw allow rules for the dockerd (2376) and telemetry (2136) ports from the orchestrator CIDRs. A no-op under the default-allow ufw policy; useful only if that policy is tightened to deny. | `no` |
-| `multihost_docker_orchestrator_cidrs` | Orchestrator source CIDRs the port allow-rules apply to. | `[]` |
+
+ufw is enabled with a **default-allow** policy; the role adds no port restrictions of its own.
+The dockerd (2376) and telemetry (2136) ports are exposed on all interfaces — restrict reachability
+with security groups. dockerd requires mTLS, but the telemetry endpoint is unauthenticated
+plain HTTP.
 
 ### Storage quota settings
 
@@ -167,7 +178,7 @@ not need to set it in your play.
 | Name | Description | Default |
 | --- | --- | --- |
 | `network_ip_pools` | Available IP ranges for Docker network creation. | `["192.168.0.0/16"]` |
-| `network_prefix_length` | Prefix bits for new Docker networks; determines containers-per-network (2^(32-*n*)-3) and the total network count. Defaults to `26` to match cork's worker daemon config. | `26` |
+| `network_prefix_length` | Prefix bits for new Docker networks; determines containers-per-network (2^(32-*n*)-3) and the total network count. The default, `29`, allows 5 containers per network. This value must be lowered to host challenges with more than 5 running containers per instance. | `29` |
 
 ### User namespace settings
 
@@ -198,5 +209,6 @@ not need to set it in your play.
 | `docker_reaper_enabled` | Whether to run `docker-reaper` as a scheduled systemd service. | `yes` |
 | `docker_reaper_version` | The version of `docker-reaper` to run. | `latest` |
 | `docker_reaper_upgrade` | Whether to upgrade `docker-reaper` if already installed. | `no` |
-| `docker_reaper_command` | Command-line arguments to pass to `docker-reaper`. | `containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks` |
+| `docker_reaper_command` | Container/network sweep arguments. Runs as the unit's first `ExecStart`. | `containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks` |
+| `docker_reaper_images_command` | Image sweep arguments, run as a second `ExecStart` after the container sweep. Requires docker-reaper ≥ v1.2.0, which introduced the `images` subcommand. | `images --threshold 80 --target 70` |
 | `docker_reaper_interval_secs` | How frequently (in seconds) to run `docker-reaper`. | `60` |

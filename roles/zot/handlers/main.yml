@@ -4,8 +4,11 @@
     daemon_reload: yes
   become: yes
 
+# install.yml and config.yml notify unconditionally, but service.yml (which writes the
+# unit) is gated — without this guard, zot_service_enabled: no fails in flush_handlers.
 - name: Restart zot
   ansible.builtin.service:
     name: zot.service
     state: restarted
   become: yes
+  when: zot_service_enabled | bool

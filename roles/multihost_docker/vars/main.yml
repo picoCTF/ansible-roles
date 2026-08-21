@@ -14,6 +14,12 @@ worker_docker_port: 2376
 worker_telemetry_port: 2136
 
 cork_telemetry_install_path: "/usr/local/bin"
+cork_telemetry_binary_filename: "telemetry"
+cork_telemetry_config_dir: "/etc/cork-telemetry"
+
+# Records the URL the installed binary came from. The telemetry agent exposes no version
+# flag, so this stands in for the version probe the other roles run against their binary.
+cork_telemetry_install_marker: "{{ cork_telemetry_config_dir }}/.installed-source"
 
 systemd_unit_dir: "/etc/systemd/system/"
 systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"

@@ -1,6 +1,11 @@
 ---
 
 # Install the zot registry binary (upstream release — a single static executable).
+#
+# zot exposes no version flag, so the installed release is tracked by recording its
+# download URL in a marker file. Comparing against that (rather than letting get_url
+# compare timestamps against the existing binary) is what makes a zot_version change
+# take effect in either direction.
 
 - name: Ensure zot config directory exists
   ansible.builtin.file:
@@ -8,12 +13,60 @@
     state: directory
     mode: "0755"
 
+- name: Check whether zot is installed
+  ansible.builtin.stat:
+    path: "{{ zot_install_path }}"
+  register: zot_binary
+
+- name: Check whether the zot install marker exists
+  ansible.builtin.stat:
+    path: "{{ zot_install_marker }}"
+  register: zot_marker
+
+- name: Read the zot install marker
+  ansible.builtin.slurp:
+    src: "{{ zot_install_marker }}"
+  register: zot_marker_content
+  when: zot_marker.stat.exists
+
+- name: Determine whether (re-)installation is necessary
+  ansible.builtin.set_fact:
+    zot_installation_required: "{{ (not zot_binary.stat.exists) or (not zot_marker.stat.exists) or ((zot_marker_content.content | b64decode | trim) != zot_download_url) }}"
+
+- name: Create temporary directory for download
+  ansible.builtin.tempfile:
+    state: directory
+  register: zot_download_dir
+  when: zot_installation_required
+
 - name: Download zot binary
   ansible.builtin.get_url:
+    dest: "{{ zot_download_dir.path }}"
     url: "{{ zot_download_url }}"
+    checksum: "{{ zot_checksum | default('') | ternary(zot_checksum, omit) }}"
+  when: zot_installation_required
+
+- name: Copy zot binary to install location
+  ansible.builtin.copy:
+    src: "{{ zot_download_dir.path }}/{{ zot_binary_filename }}"
     dest: "{{ zot_install_path }}"
     mode: "0755"
-    force: "{{ zot_upgrade | bool }}"
-    checksum: "{{ zot_checksum | default('') | ternary(zot_checksum, omit) }}"
+    remote_src: yes
+  when: zot_installation_required
   notify:
     - Restart zot
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ zot_download_dir.path }}"
+    state: absent
+  when: zot_installation_required
+
+# Written only after the binary is in place, so a failed copy leaves the old marker
+# and the next run retries.
+- name: Record the installed zot source
+  ansible.builtin.copy:
+    content: "{{ zot_download_url }}\n"
+    dest: "{{ zot_install_marker }}"
+    mode: "0644"
+  when: zot_installation_required

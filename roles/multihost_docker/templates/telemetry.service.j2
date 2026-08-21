@@ -5,7 +5,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart={{ cork_telemetry_install_path }}/telemetry
+ExecStart={{ cork_telemetry_install_path }}/{{ cork_telemetry_binary_filename }}
 Environment=TELEMETRY_PORT={{ worker_telemetry_port }}
 Restart=always
 RestartSec=1

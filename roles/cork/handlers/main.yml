@@ -4,11 +4,15 @@
     daemon_reload: yes
   become: yes
 
+# certs.yml notifies this from behind cork_deploy_certs, but service.yml (which writes
+# the unit) is gated on cmgrd_service_enabled — without this guard, disabling the service
+# while deploying certs fails in flush_handlers.
 - name: Restart cmgrd
   ansible.builtin.service:
     name: cmgrd
     state: restarted
   become: yes
+  when: cmgrd_service_enabled | bool
 
 - name: Restart cmgr artifact server
   ansible.builtin.service:

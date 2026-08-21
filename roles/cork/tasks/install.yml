@@ -17,13 +17,14 @@
     path: "{{ install_location }}/cmgrd"
   register: cmgrd_binary
 
+# cmgrd reports its own version locally; cmgrd-cli's `version` is an HTTP call to a
+# running daemon, which is not available mid-upgrade.
 - name: Determine installed cork version
   ansible.builtin.command:
-    cmd: "{{ install_location }}/cmgrd-cli version"
+    cmd: "{{ install_location }}/cmgrd --version"
   when: (upgrade | bool) and cmgrd_binary.stat.exists
   register: cork_version_output
   changed_when: false
-  failed_when: false
 
 - name: Determine latest cork version
   ansible.builtin.uri:
@@ -35,7 +36,7 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    installation_required: "{{ (clean_upgrade | bool) or (not cmgrd_binary.stat.exists) or ((upgrade | bool) and version != 'latest' and cork_version_output.stdout != version) or ((upgrade | bool) and version == 'latest' and cork_version_output.stdout != latest_version_response.url.split('/tag/')[1]) }}"
+    installation_required: "{{ (clean_upgrade | bool) or (not cmgrd_binary.stat.exists) or ((upgrade | bool) and version != 'latest' and (cork_version_output.stdout | replace('Version:', '') | trim) != version) or ((upgrade | bool) and version == 'latest' and (cork_version_output.stdout | replace('Version:', '') | trim) != latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:

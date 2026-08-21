@@ -50,4 +50,3 @@ docker_reaper_interval_secs: 60
 cork_telemetry_enabled: yes
 cork_telemetry_version: "v0.0.1"
 cork_telemetry_download_url: "REPLACE_ME"
-cork_telemetry_upgrade: no

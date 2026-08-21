@@ -49,8 +49,8 @@ unix socket. The `certs.d` set is used by the local dockerd to push and by cmgrd
 | --- | --- | --- |
 | version | cork release version to install (e.g. `vX.Y.Z`), or `latest`. | `latest` |
 | upgrade | Whether to upgrade an existing cork installation. Check release notes for breaking changes. | `false` |
-| clean_upgrade | With `upgrade`, remove the cmgr database, artifact tarballs, and local build images first, and force reinstall even if the version is unchanged. Prunes all unused local images (`docker image prune --all`). | `false` |
-| cork_github_url | Release repo to download cork from. **Placeholder** `REPLACE_ME` until cork publishes releases; the asset `cmgr_linux_amd64.tar.gz` must contain `cmgrd` + `cmgrd-cli`. | `REPLACE_ME` |
+| clean_upgrade | With `upgrade`, remove the cmgr database and local build images first, and force reinstall even if the version is unchanged. Prunes all unused local images (`docker image prune --all`). **Destructive:** it runs `rm -rf` over everything in `cmgr_artifact_dir`, which defaults to the same directory as `cmgr_dir` — with the defaults that deletes the challenge tree, not just artifacts. It also does not touch the workers, so every challenge container running on them is orphaned until docker-reaper's sweep reclaims it. | `false` |
+| cork_github_url | Release repo to download cork from, e.g. `https://github.com/CyLabAcademy/challenge-orchestrator`. The asset `cmgr_linux_amd64.tar.gz` must contain `cmgrd` + `cmgrd-cli`. The default is a **placeholder** and the role asserts against it, so this must always be set explicitly. | `REPLACE_ME` |
 
 ### Certificate deployment
 
@@ -69,7 +69,7 @@ unix socket. The `certs.d` set is used by the local dockerd to push and by cmgrd
 | cmgr_db | Path to the cmgr database file. | `/challenges/cmgr.db` |
 | cmgr_dir | Challenge directory (set to `0770`). | `/challenges` |
 | cmgr_artifact_dir | Directory for artifact bundles. | `/challenges` |
-| cmgr_logging | Logging verbosity. | `warn` |
+| cmgr_logging | Sets `CMGR_LOGGING` in the unit, but **cmgrd ignores it** — it hardcodes `INFO`. Kept only so the variable is available if cork wires it up later. | `warn` |
 | cmgr_registry_cert_dir | Override for `CMGR_REGISTRY_CERT_DIR` (default is `/etc/docker/certs.d/<registry>`). | unset |
 | cmgr_ports | Challenge port range, e.g. `49152-65535`. Consider pairing with the `os` role's `ephemeral_port_range`. | unset |
 | cmgr_concurrent_launches | `CMGR_CONCURRENT_LAUNCHES` (1 or 2). | unset (cork default 2) |
@@ -104,7 +104,28 @@ unix socket. The `certs.d` set is used by the local dockerd to push and by cmgrd
     - include_role:
         name: picoctf.ansible_roles.cork
       vars:
-        cork_github_url: "https://github.com/.../cork"   # once cork publishes releases
+        cork_github_url: "https://github.com/CyLabAcademy/challenge-orchestrator"
         cork_cert_src: "../challenge-orchestrator/config-examples/docker-certs"
         cmgr_registry: "10.12.34.121:5000"
 ```
+
+## Post-deploy: register the workers
+
+**This role does not register workers, and a successful run does not give you a working fleet.**
+Worker membership is runtime state in cmgrd's database, not configuration, so it is applied against
+the running daemon:
+
+```shell
+$ cmgrd-cli worker-add <private-ip> [public-address]   # once per worker
+$ cmgrd-cli worker-list                                # each should read "ok" after ~1s
+```
+
+Until at least one worker is registered, cmgrd falls back to **single-host mode** and launches
+challenges on the orchestrator's own build daemon. This fallback is silent — nothing logs an error
+and the playbook reports success — and it is not health-gated, because the per-worker telemetry
+pollers are cork's only health system. Placement is round robin across registered workers, skipping
+any reporting overloaded or down.
+
+Worker changes take effect immediately; no `cmgrd` restart is needed. Re-running `worker-add` for an
+IP that is already present rebuilds its connection from scratch, which is also the only way to
+recover a worker that has been marked `down` (that state is sticky by design).
