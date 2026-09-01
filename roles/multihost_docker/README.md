@@ -13,90 +13,47 @@ drive, the box holds read-only pull credentials for the fleet's
 
 Once applied, the host is a ready target for `worker-add <ip>` on the orchestrator.
 
-This role is a specialization of the generic `docker` role. The **key difference** is
-TLS: the generic role *generates* a self-signed CA and certs per host, whereas a cork
-worker *receives* pre-generated, fleet-wide certs from the Ansible controller (see
-[TLS material](#tls-material-two-ca-model)). All other behavior — storage quotas, cgroup
-limits, user-namespace remapping, the OCI interceptor, the log driver, container egress
-firewalling, and docker-reaper — is inherited unchanged.
+This role is a specialization of the generic [`docker` role](../docker/README.md). The
+**key difference** is TLS: the generic role *generates* a self-signed CA and certs per
+host, whereas a cork worker *receives* pre-generated, fleet-wide certs from the Ansible
+controller. Everything else — storage quotas, the cgroup slice, user-namespace remapping,
+the OCI interceptor, the log driver, and container egress firewalling — is inherited
+unchanged; consult the `docker` role for what those do and why.
 
-## TLS material (two-CA model)
+## TLS material
 
-cork uses **two** private certificate authorities, both of whose keys stay offline (on
-no deployed box):
+Stage the bundle produced by `config-examples/gen-docker-certs.sh` in the
+[challenge-orchestrator](https://github.com/CyLabAcademy/challenge-orchestrator) repo on
+the Ansible controller at `multihost_docker_cert_src`. A worker needs six of its files;
+the role deploys them to the paths `daemon.json` and dockerd already reference:
 
-- **`docker-ca`** secures the mTLS channel between `cmgrd` and each worker's `dockerd`.
-  Every worker shares **one** server certificate whose CN/SAN is `academy-docker-worker`
-  — `cmgrd` pins that name rather than the dialed IP, so workers can be cloned without
-  reprovisioning. `cmgrd` presents the `cmgr` client cert (which lives only on the
-  orchestrator, **never** on a worker).
-- **`zot-ca`** secures the registry. Workers pull challenge images using a shared,
-  read-only `worker` client cert under `/etc/docker/certs.d/<registry>/`.
+- `docker-{ca-cert,server-cert,server-key}.pem` → `{{ tls_cert_path }}/`, serving the
+  daemon socket over TLS on **2376**, which is where `cmgrd` dials.
+- `zot-{ca-cert,worker-cert,worker-key}.pem` → `/etc/docker/certs.d/<registry>/`, the
+  read-only pull credentials for the registry.
 
-The six leaf files are produced by `config-examples/gen-docker-certs.sh` in the
-`challenge-orchestrator` repo and **staged on the Ansible controller** at
-`multihost_docker_cert_src` before running this role. No CA private key and no `cmgr`
-identity is ever copied to a worker.
-
-| Controller file (`multihost_docker_cert_src/`) | Deployed to | Purpose |
-| --- | --- | --- |
-| `docker-ca-cert.pem` | `/root/.docker_certs/docker-ca-cert.pem` | dockerd `--tlscacert` (verify cmgrd's client cert) |
-| `docker-server-cert.pem` | `/root/.docker_certs/docker-server-cert.pem` | dockerd `--tlscert` (shared `academy-docker-worker` cert) |
-| `docker-server-key.pem` | `/root/.docker_certs/docker-server-key.pem` | dockerd `--tlskey` |
-| `zot-ca-cert.pem` | `/etc/docker/certs.d/<registry>/ca.crt` | verify zot's server cert |
-| `zot-worker-cert.pem` | `/etc/docker/certs.d/<registry>/client.cert` | zot read-only pull cert |
-| `zot-worker-key.pem` | `/etc/docker/certs.d/<registry>/client.key` | zot pull key |
-
-The daemon socket is exposed over TLS on port **2376**; `cmgrd` dials
-`tcp://<worker-ip>:2376`. See [settings](#tls-material-settings) below.
+**No CA private key and no `cmgr` client identity is ever copied to a worker.** See cork's
+README for the two-CA design and why the dockerd server certificate is shared fleet-wide.
 
 ## cork-telemetry
 
-`cmgrd` polls `http://<worker>:2136/health` roughly twice a second and expects an HTTP
-200 with a JSON body `{"overloaded": <bool>}`; a worker reporting `overloaded: true` is
-skipped for new placement. This role installs the `cork-telemetry` binary and a systemd
-unit that serves that endpoint. The endpoint is plain HTTP by design — it carries no
-secret and needs no TLS — so no certificates are deployed for it.
-
-> **Placeholder download.** CyLabAcademy/cork-telemetry has no public release asset URL
-> yet, so `cork_telemetry_download_url` defaults to `REPLACE_ME` and the role will fail
-> fast until you set it (or set `cork_telemetry_enabled: no`). Point it at the
-> `telemetry` binary asset. See [settings](#cork-telemetry-settings).
-
-## Inherited Docker configuration
-
-The following are configured exactly as in the `docker` role; consult that role's
-documentation for the full rationale.
-
-- **Storage quotas** — daemon state on a separate XFS device mounted with `pquota`, so
-  volume and container-layer sizes can be capped (`storage_quotas`, `storage_device`).
-- **cgroup parent limits** — a `limit_docker.slice` caps combined container CPU/memory to
-  80% of the host, with memory + swap accounting enabled.
-- **More Docker networks** — the default address-pool subnet size is set so thousands of
-  isolated per-instance networks are available. At the default `network_prefix_length` of
-  29 each network holds up to 5 containers; lower it to host challenges that run more
-  containers than that per instance.
-- **User-namespace remapping** — UID 0 in containers maps to an unprivileged host UID
-  (`userns_remap_enabled`).
-- **OCI runtime** — the [oci-interceptor](https://github.com/picoCTF/oci-interceptor)
-  runc wrapper (`oci_interceptor_*`).
-- **Log driver** — the `local` driver with a per-container size cap (`logs_max_*`).
-- **Firewall** — container egress to the EC2 metadata endpoint (and any extra
-  `container_deny_ipv4_cidrs`) is rejected via the `DOCKER-USER` chain.
+Installs the [cork-telemetry](https://github.com/CyLabAcademy/cork-telemetry) binary from its
+GitHub release, plus a systemd unit serving the health endpoint `cmgrd` polls to gauge worker
+load. The endpoint is plain HTTP by design — it carries no secret — so no certificates are
+deployed for it.
 
 ## Docker resource reaper
 
 [docker-reaper](https://github.com/picoCTF/docker-reaper) is installed and enabled as a
-systemd service + timer. By default it runs every minute and does two sweeps: it removes
-on-demand cmgr containers and networks (`label=cmgr.dynamic=true`) more than an hour old,
-keeping a busy worker clean of finished challenge instances, and then evicts unused images
-once the image store's filesystem passes 80% full, down to 70%. Configurable via
+systemd service + timer. Unlike in the `docker` role it runs **two** sweeps per firing: the
+inherited container/network sweep, then an image-eviction sweep that frees the image store
+once its filesystem passes a disk-usage threshold. Configurable via
 [role variables](#docker-reaper-settings).
 
-Image eviction is safe under cork's registry design: an evicted image is at worst a re-pull
-from zot on the next placement. Container cleanup also backstops cork itself — a worker
-purged with `worker-remove`, or orphaned by a `clean_upgrade` on the orchestrator, leaves its
-containers running, and this sweep is what reclaims them.
+Both sweeps are safe here because the registry is authoritative: an evicted image is at
+worst a re-pull from zot on the next placement. The container sweep also backstops cork —
+containers left behind by `worker-remove` or by a `clean_upgrade` on the orchestrator are
+reclaimed here.
 
 ## Usage
 
@@ -116,10 +73,9 @@ Then include the role for your worker hosts:
     - include_role:
         name: picoctf.ansible_roles.multihost_docker
       vars:
-        multihost_docker_cert_src: "../challenge-orchestrator/config-examples/docker-certs"
-        multihost_docker_registry: "10.12.34.121:5000"
+        multihost_docker_cert_src: "./docker-certs"
+        multihost_docker_registry: "1.2.3.4:5000"
         storage_device: /dev/nvme1n1
-        cork_telemetry_download_url: "https://.../telemetry"   # once published
 ```
 
 The SSH user must be able to `become` root. `become` is applied by the role, so you do
@@ -145,15 +101,16 @@ plays including it must not set `gather_facts: no`.
 | `tls_access` | Whether the Docker daemon is exposed over TLS on 2376. Required for cork. | `true` |
 | `tls_cert_path` | On-host directory holding the dockerd server material; `daemon.json` points `--tlscacert`/`--tlscert`/`--tlskey` here. A `/root` subdir keeps it unreadable to a non-root container escapee. | `/root/.docker_certs` |
 | `multihost_docker_cert_src` | Path **on the Ansible controller** holding the six leaf files from `gen-docker-certs.sh` (`docker-ca-cert.pem`, `docker-server-cert.pem`, `docker-server-key.pem`, `zot-ca-cert.pem`, `zot-worker-cert.pem`, `zot-worker-key.pem`). | `./docker-certs` |
-| `multihost_docker_registry` | zot registry address (`host:port`). Also the `/etc/docker/certs.d/<dir>` name and must match `CMGR_REGISTRY` on the orchestrator. **Placeholder** — the default is not a real registry. | `1.2.3.4:5000` |
+| `multihost_docker_registry` | zot registry address (`host:port`). Also the `/etc/docker/certs.d/<dir>` name and must match `CMGR_REGISTRY` on the orchestrator. The default is a **placeholder** the role asserts against, so this must always be set. | `REPLACE_ME:5000` |
 
 ### cork-telemetry settings
 
 | Name | Description | Default |
 | --- | --- | --- |
 | `cork_telemetry_enabled` | Whether to install and run the cork-telemetry health agent. | `yes` |
-| `cork_telemetry_version` | Release tag of cork-telemetry (informational; used in messages). | `v0.0.1` |
-| `cork_telemetry_download_url` | URL of the `telemetry` binary asset. **Placeholder** `REPLACE_ME` until a public URL exists — the role fails fast if left unset while telemetry is enabled. The download is not checksum-verified. Changing this URL reinstalls the agent: the role records each install's source in `/etc/cork-telemetry/.installed-source` and compares against it, since the agent exposes no version flag. | `REPLACE_ME` |
+| `cork_telemetry_version` | The version of `cork-telemetry` to install. | `latest` |
+| `cork_telemetry_upgrade` | Whether to upgrade `cork-telemetry` if already installed. The agent has no version flag, so the role cannot detect drift on its own — pinning a different `cork_telemetry_version` only takes effect with this set. | `no` |
+| `cork_telemetry_github_url` | GitHub repo to download `cork-telemetry` from. | `https://github.com/CyLabAcademy/cork-telemetry` |
 
 ### Firewall settings
 

@@ -2,6 +2,17 @@
 
 # Deploy the fleet's pre-generated TLS material to this worker.
 
+- name: Assert a registry address is configured
+  ansible.builtin.assert:
+    that:
+      - multihost_docker_registry is defined
+      - multihost_docker_registry | length > 0
+      - "'REPLACE_ME' not in multihost_docker_registry"
+    fail_msg: >-
+      multihost_docker_registry is still the placeholder. Set it to the zot registry's
+      host:port; it names the certs.d directory and must match cmgr_registry on the
+      orchestrator.
+
 - name: Ensure Docker TLS certificate directory exists
   ansible.builtin.file:
     path: "{{ tls_cert_path }}"

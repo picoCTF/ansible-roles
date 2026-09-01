@@ -2,15 +2,15 @@
 
 # Install cork (cmgrd daemon + cmgrd-cli client)
 
-- name: Assert a cork download source is configured
+- name: Assert a registry address is configured
   ansible.builtin.assert:
     that:
-      - cork_github_url is defined
-      - cork_github_url | length > 0
-      - cork_github_url != "REPLACE_ME"
+      - cmgr_registry is defined
+      - cmgr_registry | length > 0
+      - "'REPLACE_ME' not in cmgr_registry"
     fail_msg: >-
-      cork_github_url is unset (placeholder). cork has no public release yet; point it at
-      the release repo (asset {{ cork_binaries_filename }} = cmgrd + cmgrd-cli).
+      cmgr_registry is still the placeholder. Set it to the zot registry's host:port; it
+      names the certs.d directory and must match multihost_docker_registry on the workers.
 
 - name: Check whether cmgrd is installed
   ansible.builtin.stat:

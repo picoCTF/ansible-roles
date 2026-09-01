@@ -20,7 +20,7 @@ multihost_docker_cert_src: "./docker-certs"
 # The zot registry address (host:port) also used as the the /etc/docker/certs.d/<dir> name and
 # the registry challenge images are tagged with. Must match CMGR_REGISTRY on the
 # orchestrator.
-multihost_docker_registry: "1.2.3.4:5000"
+multihost_docker_registry: "REPLACE_ME:5000"
 
 storage_quotas: yes
 storage_device: "/dev/nvme1n1"
@@ -48,5 +48,6 @@ docker_reaper_images_command: "images --threshold 80 --target 70"
 docker_reaper_interval_secs: 60
 
 cork_telemetry_enabled: yes
-cork_telemetry_version: "v0.0.1"
-cork_telemetry_download_url: "REPLACE_ME"
+cork_telemetry_version: "latest"
+cork_telemetry_upgrade: no
+cork_telemetry_github_url: "https://github.com/CyLabAcademy/cork-telemetry"

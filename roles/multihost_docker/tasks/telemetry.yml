@@ -7,50 +7,26 @@
 # is plain HTTP by design — it carries no secret and needs no TLS — so there are
 # no certs to deploy here.
 #
-# The release binary is a single static executable (no tarball). Until
-# CyLabAcademy/cork-telemetry publishes a public asset URL, `cork_telemetry_download_url`
-# is a placeholder; set it to install.
-#
-# The agent exposes no version flag, so the installed release is tracked by recording
-# its download URL in a marker file. Comparing against that (rather than letting get_url
-# compare timestamps against the existing binary) is what makes a URL change take effect.
-
-- name: Assert a telemetry download URL is configured
-  ansible.builtin.assert:
-    that:
-      - cork_telemetry_download_url is defined
-      - cork_telemetry_download_url | length > 0
-      - cork_telemetry_download_url != "REPLACE_ME"
-    fail_msg: >-
-      cork_telemetry_download_url is unset (placeholder). Point it at the
-      cork-telemetry {{ cork_telemetry_version }} `telemetry` binary asset, or set
-      cork_telemetry_enabled: no to skip telemetry.
-
-- name: Ensure cork-telemetry state directory exists
-  ansible.builtin.file:
-    path: "{{ cork_telemetry_config_dir }}"
-    state: directory
-    mode: "0755"
+# The release asset is a single static executable, so there is nothing to unpack.
+# The agent exposes no version flag either, so there is no installed-version probe
+# to compare against; a version change requires cork_telemetry_upgrade.
 
 - name: Check whether cork-telemetry is installed
   ansible.builtin.stat:
     path: "{{ cork_telemetry_install_path }}/{{ cork_telemetry_binary_filename }}"
   register: cork_telemetry_binary
 
-- name: Check whether the cork-telemetry install marker exists
-  ansible.builtin.stat:
-    path: "{{ cork_telemetry_install_marker }}"
-  register: cork_telemetry_marker
-
-- name: Read the cork-telemetry install marker
-  ansible.builtin.slurp:
-    src: "{{ cork_telemetry_install_marker }}"
-  register: cork_telemetry_marker_content
-  when: cork_telemetry_marker.stat.exists
+- name: Determine latest cork-telemetry version
+  ansible.builtin.uri:
+    url: "{{ cork_telemetry_github_url }}/releases/latest"
+    method: HEAD
+    follow_redirects: safe
+  register: cork_telemetry_latest_version_response
+  when: cork_telemetry_version == "latest" and (not cork_telemetry_binary.stat.exists or (cork_telemetry_upgrade | bool))
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    cork_telemetry_installation_required: "{{ (not cork_telemetry_binary.stat.exists) or (not cork_telemetry_marker.stat.exists) or ((cork_telemetry_marker_content.content | b64decode | trim) != cork_telemetry_download_url) }}"
+    cork_telemetry_installation_required: "{{ (not cork_telemetry_binary.stat.exists) or (cork_telemetry_upgrade | bool) }}"
 
 - name: Create temporary directory for download
   ansible.builtin.tempfile:
@@ -58,12 +34,10 @@
   register: cork_telemetry_download_dir
   when: cork_telemetry_installation_required
 
-# Named explicitly rather than letting get_url derive it: the download URL is
-# operator-supplied and its basename is not guaranteed to match the binary name.
 - name: Download cork-telemetry binary
   ansible.builtin.get_url:
-    url: "{{ cork_telemetry_download_url }}"
     dest: "{{ cork_telemetry_download_dir.path }}/{{ cork_telemetry_binary_filename }}"
+    url: "{{ cork_telemetry_github_url }}/releases/download/{{ cork_telemetry_latest_version_response.url.split('/tag/')[1] if cork_telemetry_version == 'latest' else cork_telemetry_version }}/{{ cork_telemetry_binary_filename }}"
   when: cork_telemetry_installation_required
 
 - name: Copy cork-telemetry binary to install location
@@ -80,15 +54,6 @@
   ansible.builtin.file:
     path: "{{ cork_telemetry_download_dir.path }}"
     state: absent
-  when: cork_telemetry_installation_required
-
-# Written only after the binary is in place, so a failed copy leaves the old marker
-# and the next run retries.
-- name: Record the installed cork-telemetry source
-  ansible.builtin.copy:
-    content: "{{ cork_telemetry_download_url }}\n"
-    dest: "{{ cork_telemetry_install_marker }}"
-    mode: "0644"
   when: cork_telemetry_installation_required
 
 - name: Ensure telemetry.service systemd unit exists

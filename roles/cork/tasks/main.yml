@@ -18,7 +18,6 @@
       become: yes
 
 - include_tasks: service.yml
-  when: cmgrd_service_enabled | bool
   args:
     apply:
       become: yes

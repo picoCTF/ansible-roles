@@ -2,20 +2,13 @@
 
 ## Description
 
-Installs [cork](https://github.com/picoCTF/cmgr) — the multi-host challenge orchestrator
-(a fork of cmgr) — on a host. Downloads the `cmgrd` daemon and `cmgrd-cli` client to
-`/usr/local/bin`, deploys the orchestrator's TLS material, and optionally runs `cmgrd` as
-a systemd service.
+Installs [cork](https://github.com/CyLabAcademy/challenge-orchestrator) — the multi-host
+challenge orchestrator on a host. Downloads the `cmgrd` daemon and `cmgrd-cli` client to
+`/usr/local/bin`, deploys the orchestrator's TLS material, and runs `cmgrd` and
+`cmgr-artifact-server` as systemd services.
 
-cork drives a fleet of worker dockerds over mTLS and pushes/pulls challenge images through
-a zot registry. This role is derived from the `cmgr` role but slimmed for cork: it manages
-a single `cmgrd` instance (cork provides multi-host support natively, so the cmgr role's
-multi-mode and the env-injecting CLI wrapper are dropped) and adds first-class two-CA cert
-deployment. `cmgrd-cli` is a thin HTTP client and needs no wrapper — it talks to the daemon
-via `CMGRD_SERVER` (default `http://127.0.0.1:4200`).
-
-The `cmgrd` API is exposed over HTTP on port 4200 with **no authentication** — restrict
-access with security groups / a private network.
+This role is derived from the cmgr role. See the
+[challenge-orchestrator README](https://github.com/CyLabAcademy/challenge-orchestrator).
 
 ### Prerequisites
 
@@ -23,23 +16,18 @@ The orchestrator builds images on a **local Docker daemon**, so its play must al
 the [`docker` role](../docker/README.md) (which additionally provides docker-reaper). This
 role does not install Docker. Base OS setup (`os`, `atop`, `cloudwatch_agent`) is assumed.
 
-### TLS material (two-CA)
+### TLS material
 
-cork holds the `CN=cmgr` **client** identity in both trust domains. Stage the bundle from
-`config-examples/gen-docker-certs.sh` on the Ansible controller at `cork_cert_src`; the role
-copies the orchestrator's two client sets (never a CA key):
+Stage the bundle produced by `config-examples/gen-docker-certs.sh` on the Ansible
+controller at `cork_cert_src`. The role copies the orchestrator's two client sets — never
+a CA key — to the paths cork and dockerd read them from:
 
-| controller file | destination | purpose |
-| --- | --- | --- |
-| `docker-ca-cert.pem` | `{{ docker_cert_path }}/ca.pem` | verify worker dockerd server cert |
-| `docker-client-cert.pem` | `{{ docker_cert_path }}/cert.pem` | cork → worker dockerds |
-| `docker-client-key.pem` | `{{ docker_cert_path }}/key.pem` | |
-| `zot-ca-cert.pem` | `/etc/docker/certs.d/<registry>/ca.crt` | verify zot server cert |
-| `zot-client-cert.pem` | `/etc/docker/certs.d/<registry>/client.cert` | push (rw) + cmgrd delete |
-| `zot-client-key.pem` | `/etc/docker/certs.d/<registry>/client.key` | |
+- `docker-{ca-cert,client-cert,client-key}.pem` → `{{ docker_cert_path }}/{ca,cert,key}.pem`,
+  used for cork's connections to the worker daemons.
+- `zot-{ca-cert,client-cert,client-key}.pem` → `/etc/docker/certs.d/<registry>/{ca.crt,client.cert,client.key}`,
+  used by the local dockerd to push and by cmgrd to delete tags.
 
-`DOCKER_CERT_PATH` is set for cork's worker connections; the local build daemon uses the
-unix socket. The `certs.d` set is used by the local dockerd to push and by cmgrd to delete.
+The local build daemon itself is reached over the unix socket, so it needs no certificates.
 
 ## Role Variables
 
@@ -48,39 +36,43 @@ unix socket. The `certs.d` set is used by the local dockerd to push and by cmgrd
 | Name | Description | Default |
 | --- | --- | --- |
 | version | cork release version to install (e.g. `vX.Y.Z`), or `latest`. | `latest` |
-| upgrade | Whether to upgrade an existing cork installation. Check release notes for breaking changes. | `false` |
-| clean_upgrade | With `upgrade`, remove the cmgr database and local build images first, and force reinstall even if the version is unchanged. Prunes all unused local images (`docker image prune --all`). **Destructive:** it runs `rm -rf` over everything in `cmgr_artifact_dir`, which defaults to the same directory as `cmgr_dir` — with the defaults that deletes the challenge tree, not just artifacts. It also does not touch the workers, so every challenge container running on them is orphaned until docker-reaper's sweep reclaims it. | `false` |
-| cork_github_url | Release repo to download cork from, e.g. `https://github.com/CyLabAcademy/challenge-orchestrator`. The asset `cmgr_linux_amd64.tar.gz` must contain `cmgrd` + `cmgrd-cli`. The default is a **placeholder** and the role asserts against it, so this must always be set explicitly. | `REPLACE_ME` |
+| upgrade | Whether to upgrade an existing cork installation. | `false` |
+| clean_upgrade | With `upgrade`, remove the cmgr database and local build images first, and force reinstall even if the version is unchanged. **Destructive:** it runs `rm -rf` over everything in `cmgr_artifact_dir`, which defaults to the same directory as `cmgr_dir` — with the defaults that deletes the challenge tree, not just artifacts. It also does not touch the workers, so challenge containers running there are orphaned until docker-reaper reclaims them. | `false` |
+| cork_github_url | Release repo to download cork from. The asset `cmgr_linux_amd64.tar.gz` must contain `cmgrd` + `cmgrd-cli`. | `https://github.com/CyLabAcademy/challenge-orchestrator` |
 
 ### Certificate deployment
 
 | Name | Description | Default |
 | --- | --- | --- |
 | cork_deploy_certs | Whether to deploy the two client cert sets from the controller. | `true` |
-| cork_cert_src | Path **on the Ansible controller** holding the gen-docker-certs.sh bundle (needs `docker-ca-cert.pem`, `docker-client-cert.pem`, `docker-client-key.pem`, `zot-ca-cert.pem`, `zot-client-cert.pem`, `zot-client-key.pem`). | `./docker-certs` |
-| docker_cert_path | On-host `DOCKER_CERT_PATH` — where cork reads the docker-client certs for worker connections. | `/root/.docker_certs` |
+| cork_cert_src | Path **on the Ansible controller** holding the six bundle files listed above. | `./docker-certs` |
+| docker_cert_path | On-host `DOCKER_CERT_PATH`. | `/root/.docker_certs` |
 
 ### cmgrd service configuration
 
+`cmgrd` always runs as a systemd service. Each variable below sets the matching `CMGR_*`
+environment variable in the unit; see cork's README for what each one does. Those left
+unset are omitted from the unit entirely, so cork's own defaults apply.
+
 | Name | Description | Default |
 | --- | --- | --- |
-| cmgrd_service_enabled | Whether to run `cmgrd` as a systemd service. | `true` |
-| cmgr_registry | zot registry address (`host:port`). Sets `CMGR_REGISTRY` and names the `certs.d` directory; must match the workers and how images are tagged. | `1.2.3.4:5000` (placeholder) |
-| cmgr_db | Path to the cmgr database file. | `/challenges/cmgr.db` |
-| cmgr_dir | Challenge directory (set to `0770`). | `/challenges` |
-| cmgr_artifact_dir | Directory for artifact bundles. | `/challenges` |
-| cmgr_logging | Sets `CMGR_LOGGING` in the unit, but **cmgrd ignores it** — it hardcodes `INFO`. Kept only so the variable is available if cork wires it up later. | `warn` |
-| cmgr_registry_cert_dir | Override for `CMGR_REGISTRY_CERT_DIR` (default is `/etc/docker/certs.d/<registry>`). | unset |
-| cmgr_ports | Challenge port range, e.g. `49152-65535`. Consider pairing with the `os` role's `ephemeral_port_range`. | unset |
-| cmgr_concurrent_launches | `CMGR_CONCURRENT_LAUNCHES` (1 or 2). | unset (cork default 2) |
-| cmgr_prune_age | `CMGR_PRUNE_AGE` for on-demand instances, e.g. `1h`. | unset (cork default 1h) |
-| cmgr_db_wal | `CMGR_DB_WAL` (`false`/`off`/`0` to disable SQLite WAL). | unset (cork default on) |
-| cmgr_enable_disk_quotas | Set truthy to enable the disk-quota challenge option. | unset |
+| cmgr_registry | `CMGR_REGISTRY`. Also names the `certs.d` directory, so it must match the workers and how images are tagged. The default is a **placeholder** the role asserts against, so this must always be set. | `REPLACE_ME:5000` |
+| cmgr_db | `CMGR_DB`. | `/challenges/cmgr.db` |
+| cmgr_dir | `CMGR_DIR`. Created `0770`. | `/challenges` |
+| cmgr_artifact_dir | `CMGR_ARTIFACT_DIR`. Also used by the artifact server. | `/challenges` |
+| cmgr_logging | Sets `CMGR_LOGGING`, but **cmgrd ignores it** — it hardcodes `INFO`. | `warn` |
+| cmgr_registry_cert_dir | `CMGR_REGISTRY_CERT_DIR`. | unset |
+| cmgr_ports | `CMGR_PORTS`, e.g. `49152-65535`. Consider pairing with the `os` role's `ephemeral_port_range`. | unset |
+| cmgr_concurrent_launches | `CMGR_CONCURRENT_LAUNCHES` (1 or 2). | unset |
+| cmgr_prune_age | `CMGR_PRUNE_AGE`, e.g. `1h`. | unset |
+| cmgr_db_wal | `CMGR_DB_WAL` (`false`/`off`/`0` to disable). | unset |
+| cmgr_enable_disk_quotas | `CMGR_ENABLE_DISK_QUOTAS`. | unset |
 | cmgr_extra_environment_vars | Extra environment variables for the cmgrd service, as a string map. | `{}` |
 
-### Artifact server configuration
+`CMGR_INTERFACE`, `CMGR_REGISTRY_USER`, and `CMGR_REGISTRY_TOKEN` are deliberately not
+set because cork ignores all of them.
 
-`cmgr_artifact_dir` (above) is also used by the artifact server.
+### Artifact server configuration
 
 | Name | Description | Default |
 | --- | --- | --- |
@@ -105,27 +97,15 @@ unix socket. The `certs.d` set is used by the local dockerd to push and by cmgrd
         name: picoctf.ansible_roles.cork
       vars:
         cork_github_url: "https://github.com/CyLabAcademy/challenge-orchestrator"
-        cork_cert_src: "../challenge-orchestrator/config-examples/docker-certs"
-        cmgr_registry: "10.12.34.121:5000"
+        cork_cert_src: "./docker-certs"
+        cmgr_registry: "1.2.3.4:5000"
 ```
 
 ## Post-deploy: register the workers
 
-**This role does not register workers, and a successful run does not give you a working fleet.**
-Worker membership is runtime state in cmgrd's database, not configuration, so it is applied against
-the running daemon:
+You must manually register the workers on cork. Otherwise, it will attempt to run images on its own box!
 
 ```shell
 $ cmgrd-cli worker-add <private-ip> [public-address]   # once per worker
-$ cmgrd-cli worker-list                                # each should read "ok" after ~1s
+$ cmgrd-cli worker-list
 ```
-
-Until at least one worker is registered, cmgrd falls back to **single-host mode** and launches
-challenges on the orchestrator's own build daemon. This fallback is silent — nothing logs an error
-and the playbook reports success — and it is not health-gated, because the per-worker telemetry
-pollers are cork's only health system. Placement is round robin across registered workers, skipping
-any reporting overloaded or down.
-
-Worker changes take effect immediately; no `cmgrd` restart is needed. Re-running `worker-add` for an
-IP that is already present rebuilds its connection from scratch, which is also the only way to
-recover a worker that has been marked `down` (that state is sticky by design).

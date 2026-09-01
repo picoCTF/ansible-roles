@@ -2,14 +2,13 @@
 version: "latest"
 upgrade: no
 clean_upgrade: no
-cork_github_url: "REPLACE_ME"
+cork_github_url: "https://github.com/CyLabAcademy/challenge-orchestrator"
 
 cork_deploy_certs: yes
 cork_cert_src: "./docker-certs"
 docker_cert_path: "/root/.docker_certs"
-cmgr_registry: "1.2.3.4:5000"
+cmgr_registry: "REPLACE_ME:5000"
 
-cmgrd_service_enabled: yes
 cmgr_db: "{{ challenge_dir }}/cmgr.db"
 cmgr_dir: "{{ challenge_dir }}"
 cmgr_artifact_dir: "{{ challenge_dir }}"
