@@ -7,22 +7,14 @@ challenge-image store. Downloads the upstream `zot` binary, deploys a mutual-TLS
 `config.json`, a hardened systemd unit, and the registry's server-only certificates, then
 runs `zot` as a service.
 
-The deployed `config.json` mirrors `config-examples/zot/config.json` in the
-[challenge-orchestrator](https://github.com/CyLabAcademy/challenge-orchestrator) repo,
-which is where the registry's access-control design is documented. In short: mTLS only,
-identity taken from the client certificate's CommonName, and both `defaultPolicy` and
-`anonymousPolicy` empty. **Challenge images embed flags — those two policies must stay
-empty.**
-
 Base OS setup (`os`, `atop`, `cloudwatch_agent`) is assumed; network exposure is handled
 by security groups, so this role configures no firewall. The service runs under systemd
 `DynamicUser` (no service account to create) and its image store is provisioned via
-`StateDirectory=zot`. No `storage.gc*` keys are set, so zot's inline GC defaults apply.
+`StateDirectory=zot`.
 
 ### TLS material
 
-The box holds **server identity only, no client cert**. Stage the bundle produced by
-`config-examples/gen-docker-certs.sh` on the Ansible controller at `zot_cert_src`; the
+The box holds **server identity only, no client cert**. The
 role copies `zot-ca-cert.pem`, `zot-server-cert.pem`, and `zot-server-key.pem` to
 `/etc/zot/`. Note that only the CA and server certs are read from disk at runtime — the
 key is handed to the service via systemd `LoadCredential` and read from

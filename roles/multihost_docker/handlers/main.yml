@@ -13,6 +13,12 @@
     daemon_reload: yes
   become: yes
 
+- name: Apply Docker cgroup quota
+  ansible.builtin.service:
+    name: docker_cgroup_quota.service
+    state: restarted
+  become: yes
+
 - name: Restart Docker
   ansible.builtin.service:
     name: docker

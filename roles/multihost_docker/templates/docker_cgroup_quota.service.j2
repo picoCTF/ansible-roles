@@ -1,0 +1,14 @@
+[Unit]
+Description=Compute docker cgroup CPU quota on startup
+Documentation=picoctf.ansible_roles.multihost_docker
+Wants=docker.service
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Applies (80 x total host vCPUs) as the slice CPUQuota. Runs on every boot
+ExecStart=/bin/sh -c '/usr/bin/systemctl set-property --runtime {{ parent_cgroup }} CPUQuota=$(( 80 * $(nproc --all) ))%'
+
+[Install]
+WantedBy=multi-user.target

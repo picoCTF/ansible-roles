@@ -18,10 +18,6 @@ role does not install Docker. Base OS setup (`os`, `atop`, `cloudwatch_agent`) i
 
 ### TLS material
 
-Stage the bundle produced by `config-examples/gen-docker-certs.sh` on the Ansible
-controller at `cork_cert_src`. The role copies the orchestrator's two client sets — never
-a CA key — to the paths cork and dockerd read them from:
-
 - `docker-{ca-cert,client-cert,client-key}.pem` → `{{ docker_cert_path }}/{ca,cert,key}.pem`,
   used for cork's connections to the worker daemons.
 - `zot-{ca-cert,client-cert,client-key}.pem` → `/etc/docker/certs.d/<registry>/{ca.crt,client.cert,client.key}`,

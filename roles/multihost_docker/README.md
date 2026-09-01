@@ -13,57 +13,27 @@ drive, the box holds read-only pull credentials for the fleet's
 
 Once applied, the host is a ready target for `worker-add <ip>` on the orchestrator.
 
-This role is a specialization of the generic [`docker` role](../docker/README.md). The
-**key difference** is TLS: the generic role *generates* a self-signed CA and certs per
-host, whereas a cork worker *receives* pre-generated, fleet-wide certs from the Ansible
-controller. Everything else — storage quotas, the cgroup slice, user-namespace remapping,
-the OCI interceptor, the log driver, and container egress firewalling — is inherited
-unchanged; consult the `docker` role for what those do and why.
+This role is a specialization of the generic [`docker` role](../docker/README.md).
 
 ## TLS material
-
-Stage the bundle produced by `config-examples/gen-docker-certs.sh` in the
-[challenge-orchestrator](https://github.com/CyLabAcademy/challenge-orchestrator) repo on
-the Ansible controller at `multihost_docker_cert_src`. A worker needs six of its files;
-the role deploys them to the paths `daemon.json` and dockerd already reference:
 
 - `docker-{ca-cert,server-cert,server-key}.pem` → `{{ tls_cert_path }}/`, serving the
   daemon socket over TLS on **2376**, which is where `cmgrd` dials.
 - `zot-{ca-cert,worker-cert,worker-key}.pem` → `/etc/docker/certs.d/<registry>/`, the
   read-only pull credentials for the registry.
 
-**No CA private key and no `cmgr` client identity is ever copied to a worker.** See cork's
-README for the two-CA design and why the dockerd server certificate is shared fleet-wide.
-
 ## cork-telemetry
 
 Installs the [cork-telemetry](https://github.com/CyLabAcademy/cork-telemetry) binary from its
 GitHub release, plus a systemd unit serving the health endpoint `cmgrd` polls to gauge worker
-load. The endpoint is plain HTTP by design — it carries no secret — so no certificates are
-deployed for it.
+load.
 
 ## Docker resource reaper
 
 [docker-reaper](https://github.com/picoCTF/docker-reaper) is installed and enabled as a
-systemd service + timer. Unlike in the `docker` role it runs **two** sweeps per firing: the
-inherited container/network sweep, then an image-eviction sweep that frees the image store
-once its filesystem passes a disk-usage threshold. Configurable via
-[role variables](#docker-reaper-settings).
-
-Both sweeps are safe here because the registry is authoritative: an evicted image is at
-worst a re-pull from zot on the next placement. The container sweep also backstops cork —
-containers left behind by `worker-remove` or by a `clean_upgrade` on the orchestrator are
-reclaimed here.
+systemd service + timer.
 
 ## Usage
-
-Stage the fleet certs on the controller (once, from `challenge-orchestrator`):
-
-```bash
-cd config-examples && ./gen-docker-certs.sh 10.12.34.121   # -> ./docker-certs/
-```
-
-Then include the role for your worker hosts:
 
 ```yaml
 - hosts: workers
@@ -77,9 +47,6 @@ Then include the role for your worker hosts:
         multihost_docker_registry: "1.2.3.4:5000"
         storage_device: /dev/nvme1n1
 ```
-
-The SSH user must be able to `become` root. `become` is applied by the role, so you do
-not need to set it in your play.
 
 ## Role Variables
 

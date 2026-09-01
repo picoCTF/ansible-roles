@@ -1,7 +1,8 @@
 ---
 
-# Defines a custom parent cgroup for spawned containers, limiting
-# total resource consumption to 90% of available CPU and memory.
+# Defines a custom parent cgroup for spawned containers, limiting total resource
+# consumption to 80% of available CPU and memory.
+# CPU limit is recomputed on restart in case the instance size changes
 
 # Enables memory and swap accounting (typically disabled by default
 # on Debian-based systems) in order to support memory limits.
@@ -30,3 +31,18 @@
     force: yes
   notify:
     - Reload systemd config
+
+- name: Ensure boot-time CPU quota unit exists
+  ansible.builtin.template:
+    src: "docker_cgroup_quota.service.j2"
+    dest: "{{ systemd_unit_dir }}/docker_cgroup_quota.service"
+    force: yes
+  notify:
+    - Reload systemd config
+    - Apply Docker cgroup quota
+
+- name: Ensure boot-time CPU quota unit is enabled
+  ansible.builtin.systemd:
+    name: docker_cgroup_quota.service
+    daemon_reload: yes
+    enabled: yes
