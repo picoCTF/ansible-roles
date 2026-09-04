@@ -1,0 +1,21 @@
+---
+
+# Dedicated service account. zot runs as this user (see zot.service.j2) and owns the image
+# store. A static user rather than DynamicUser so the store can live on a mounted volume
+# without systemd managing, and re-chowning, it as a state directory.
+
+- name: Ensure zot group exists
+  ansible.builtin.group:
+    name: "{{ zot_user }}"
+    system: yes
+    state: present
+
+- name: Ensure zot user exists
+  ansible.builtin.user:
+    name: "{{ zot_user }}"
+    group: "{{ zot_user }}"
+    system: yes
+    shell: /usr/sbin/nologin
+    home: "{{ zot_storage_root }}"
+    create_home: no
+    state: present

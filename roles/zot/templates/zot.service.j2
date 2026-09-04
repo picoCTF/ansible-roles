@@ -9,10 +9,13 @@ ExecStart={{ zot_install_path }} serve {{ zot_config_dir }}/config.json
 Restart=always
 RestartSec=1
 
-# Port 5000 is unprivileged; zot only needs to read /etc/zot and
-# write its image store, so it runs as a dedicated locked-down user.
-DynamicUser=yes
-StateDirectory=zot
+# Port 5000 is unprivileged; zot only needs to read /etc/zot and write its image store, so
+# it runs as a dedicated locked-down user. With ProtectSystem=strict the store is the only
+# writable path; it is owned by the service user and may be a separately mounted volume
+# (see tasks/storage.yml).
+User={{ zot_user }}
+Group={{ zot_user }}
+ReadWritePaths={{ zot_storage_root }}
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

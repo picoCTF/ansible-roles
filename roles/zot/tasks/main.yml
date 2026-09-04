@@ -5,6 +5,16 @@
     apply:
       become: yes
 
+- include_tasks: user.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: storage.yml
+  args:
+    apply:
+      become: yes
+
 - include_tasks: certs.yml
   when: zot_deploy_certs | bool
   args:
