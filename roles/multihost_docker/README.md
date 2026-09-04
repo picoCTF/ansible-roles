@@ -63,9 +63,11 @@ plays including it must not set `gather_facts: no`.
 
 ### TLS material settings
 
+The daemon always listens on tcp 2376 with mutual TLS alongside the unix socket. cork dials workers over
+TLS unconditionally, so there is no option to disable it.
+
 | Name | Description | Default |
 | --- | --- | --- |
-| `tls_access` | Whether the Docker daemon is exposed over TLS on 2376. Required for cork. | `true` |
 | `tls_cert_path` | On-host directory holding the dockerd server material; `daemon.json` points `--tlscacert`/`--tlscert`/`--tlskey` here. A `/root` subdir keeps it unreadable to a non-root container escapee. | `/root/.docker_certs` |
 | `multihost_docker_cert_src` | Path **on the Ansible controller** holding the six leaf files from `gen-docker-certs.sh` (`docker-ca-cert.pem`, `docker-server-cert.pem`, `docker-server-key.pem`, `zot-ca-cert.pem`, `zot-worker-cert.pem`, `zot-worker-key.pem`). | `./docker-certs` |
 | `multihost_docker_registry` | zot registry address (`host:port`). Also the `/etc/docker/certs.d/<dir>` name and must match `CMGR_REGISTRY` on the orchestrator. The default is a **placeholder** the role asserts against, so this must always be set. | `REPLACE_ME:5000` |

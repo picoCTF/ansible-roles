@@ -1,11 +1,9 @@
 {
-    "hosts": ["unix:///var/run/docker.sock"{% if tls_access %}, "tcp://0.0.0.0:{{ worker_docker_port }}"{% endif %}],
-    {% if tls_access %}
+    "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:{{ worker_docker_port }}"],
     "tlsverify": true,
     "tlscacert": "{{ ca_cert_path }}",
     "tlscert": "{{ server_cert_path }}",
     "tlskey": "{{ server_key_path }}",
-    {% endif %}
 
     {% if storage_quotas %}
     "data-root": "{{ storage_mount_point }}",

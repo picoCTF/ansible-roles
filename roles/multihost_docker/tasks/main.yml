@@ -11,7 +11,6 @@
       become: yes
 
 - include_tasks: certs.yml
-  when: tls_access | bool
   args:
     apply:
       become: yes

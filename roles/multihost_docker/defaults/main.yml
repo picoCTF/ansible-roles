@@ -4,8 +4,6 @@ upgrade: no
 
 docker_pin_version: false
 
-tls_access: yes
-
 # Where certs land on the worker; dockerd reads them via daemon.json --tls*. A /root
 # subdir keeps them unreadable to a non-root container escapee.
 tls_cert_path: "/root/.docker_certs"
