@@ -6,7 +6,8 @@
 # Earlier versions of this role ran zot under DynamicUser with StateDirectory=zot, which
 # leaves zot_storage_root as a symlink into /var/lib/private. A mount cannot sit on a
 # symlink, so stop the old service and remove the link first. Images already pushed are
-# not migrated; cork re-pushes them on its next update.
+# not migrated, and cork only pushes at build time: repopulate by re-pushing the current
+# tags from the orchestrator's build daemon or by forcing a rebuild.
 - name: Check the current state of the image store path
   ansible.builtin.stat:
     path: "{{ zot_storage_root }}"

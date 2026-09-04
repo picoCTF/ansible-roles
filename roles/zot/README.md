@@ -23,7 +23,9 @@ the root filesystem.
 Earlier versions of this role ran zot under systemd `DynamicUser` with `StateDirectory=zot`,
 which leaves `zot_storage_root` as a symlink into `/var/lib/private`. The role migrates such a
 host by stopping zot and removing the symlink before mounting. Images already under
-`/var/lib/private/zot` are not moved; cork re-pushes them on its next update.
+`/var/lib/private/zot` are not moved, and cork does not detect a registry that lost them: it
+only pushes at build time. Repopulate by pushing the current tags from the orchestrator's
+build daemon, which keeps every image it built, or by forcing a rebuild.
 
 ### TLS material
 
