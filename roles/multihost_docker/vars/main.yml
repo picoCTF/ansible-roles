@@ -1,0 +1,38 @@
+---
+# Landing paths for the copied dockerd server material (docker-ca domain). These are
+# the paths daemon.json.j2 references for --tlscacert/--tlscert/--tlskey; the at-rest
+# filenames follow the standardized <domain>-<role>-<kind> scheme.
+ca_cert_path: "{{ tls_cert_path }}/docker-ca-cert.pem"
+server_key_path: "{{ tls_cert_path }}/docker-server-key.pem"
+server_cert_path: "{{ tls_cert_path }}/docker-server-cert.pem"
+
+# certs.d directory holding the zot pull material (zot-ca domain). The directory name
+# is the registry address (host:port) exactly as challenge images are tagged.
+registry_certs_d_path: "/etc/docker/certs.d/{{ multihost_docker_registry }}"
+
+worker_docker_port: 2376
+worker_telemetry_port: 2136
+
+cork_telemetry_install_path: "/usr/local/bin"
+cork_telemetry_binary_filename: "telemetry"
+
+systemd_unit_dir: "/etc/systemd/system/"
+systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"
+systemd_ufw_drop_in_dir: "/etc/systemd/system/ufw.service.d"
+
+storage_mount_point: "/mnt/docker-data"
+grub_cloudimg_config_path: "/etc/default/grub.d/50-cloudimg-settings.cfg"
+parent_cgroup: "limit_docker.slice"
+parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
+
+oci_interceptor_install_path: "/usr/local/bin"
+oci_interceptor_github_url: "https://github.com/picoCTF/oci-interceptor"
+oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.gz"
+
+docker_reaper_install_path: "/usr/local/bin"
+docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"
+docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"
+
+docker_version_pin_map:
+  jammy: "5:28.5.2-1~ubuntu.22.04~jammy"
+  noble: "5:28.5.2-1~ubuntu.24.04~noble"

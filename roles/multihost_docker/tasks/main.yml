@@ -1,0 +1,87 @@
+---
+
+- include_tasks: install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: group.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: certs.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: storage.yml
+  when: storage_quotas | bool
+  args:
+    apply:
+      become: yes
+
+- include_tasks: parent-cgroup.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: oci-interceptor.yml
+  when: oci_interceptor_enabled | bool
+  args:
+    apply:
+      become: yes
+
+- include_tasks: firewall.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: sysctls.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: config.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: docker-reaper.yml
+  when: docker_reaper_enabled | bool
+  args:
+    apply:
+      become: yes
+
+- include_tasks: telemetry.yml
+  when: cork_telemetry_enabled | bool
+  args:
+    apply:
+      become: yes
+
+- ansible.builtin.meta: flush_handlers
+
+- name: Ensure Docker service is active
+  ansible.builtin.service:
+    name: docker
+    state: started
+  become: yes
+  register: docker_service
+  until: docker_service.status.ActiveState == "active"
+
+- name: Ensure ufw service is active
+  ansible.builtin.service:
+    name: ufw
+    state: started
+  become: yes
+  register: ufw_service
+  until: ufw_service.status.ActiveState == "active"
+
+- name: Ensure telemetry service is active
+  ansible.builtin.service:
+    name: telemetry.service
+    state: started
+  become: yes
+  register: telemetry_service
+  until: telemetry_service.status.ActiveState == "active"
+  when: cork_telemetry_enabled | bool

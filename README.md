@@ -15,14 +15,17 @@ though they may be portable to other platforms with minor changes.
 
 ## Included Roles
 
-| Name | Description |
-| --- | --- |
-| [os](./roles/os/README.md) | Tweaks OS configuration to better support long-running servers. |
-| [atop](./roles/atop/README.md) | Configures atop to regularly log process metrics. |
-| [docker](./roles/docker/README.md) | Configures Docker Engine with ideal settings for platform components. |
-| [cmgr](./roles/cmgr/README.md) | Installs cmgr and optionally configures a cmgrd server. |
-| [actions_runner](./roles/actions_runner/README.md) | Installs the self-hosted GitHub Actions runner. |
-| [cloudwatch_agent](./roles/cloudwatch_agent/README.md) | Installs and configures the AWS CloudWatch Agent. |
+| Name                                                   | Description                                                                 |
+| ---                                                    | ---                                                                         |
+| [os](./roles/os/README.md)                             | Tweaks OS configuration to better support long-running servers.             |
+| [atop](./roles/atop/README.md)                         | Configures atop to regularly log process metrics.                           |
+| [docker](./roles/docker/README.md)                     | Configures Docker Engine with ideal settings for platform components.       |
+| [cmgr](./roles/cmgr/README.md)                         | Installs cmgr and optionally configures a cmgrd server.                     |
+| [cork](./roles/cork/README.md)                         | Installs cork (multi-host challenge orchestrator)                           |
+| [multihost_docker](./roles/multihost_docker/README.md) | Provisions a cork worker                                                    |
+| [zot](./roles/zot/README.md)                           | Installs the zot OCI registry that holds challenge images.                  |
+| [actions_runner](./roles/actions_runner/README.md)     | Installs the self-hosted GitHub Actions runner.                             |
+| [cloudwatch_agent](./roles/cloudwatch_agent/README.md) | Installs and configures the AWS CloudWatch Agent.                           |
 
 ## Quick Start
 

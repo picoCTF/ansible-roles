@@ -1,0 +1,14 @@
+galaxy_info:
+  author: picoCTF team
+  description: Installs the zot OCI image registry for the cork fleet (mTLS)
+  company: Carnegie Mellon University
+  license: MIT
+  min_ansible_version: 4
+  platforms:
+  - name: Ubuntu
+    versions:
+    - jammy
+    - noble
+  galaxy_tags: ["picoctf", "zot", "registry", "cork"]
+
+dependencies: []

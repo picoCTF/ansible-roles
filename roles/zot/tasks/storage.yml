@@ -1,0 +1,59 @@
+---
+
+# Image store: optionally a dedicated XFS volume mounted at zot_storage_root, always owned
+# by the zot service user.
+
+# Earlier versions of this role ran zot under DynamicUser with StateDirectory=zot, which
+# leaves zot_storage_root as a symlink into /var/lib/private. A mount cannot sit on a
+# symlink, so stop the old service and remove the link first. Images already pushed are
+# not migrated; cork re-pushes them on its next update.
+- name: Check the current state of the image store path
+  ansible.builtin.stat:
+    path: "{{ zot_storage_root }}"
+  register: zot_storage_root_stat
+
+- name: Stop zot before replacing a DynamicUser state symlink
+  ansible.builtin.service:
+    name: zot.service
+    state: stopped
+  register: zot_stop_for_migration
+  failed_when: zot_stop_for_migration is failed and not "Could not find the requested service" in zot_stop_for_migration.msg
+  when: zot_storage_root_stat.stat.islnk | default(false)
+
+- name: Remove the DynamicUser state symlink
+  ansible.builtin.file:
+    path: "{{ zot_storage_root }}"
+    state: absent
+  when: zot_storage_root_stat.stat.islnk | default(false)
+
+- name: Ensure the image store volume is formatted as XFS
+  community.general.filesystem:
+    dev: "{{ zot_storage_device }}"
+    fstype: xfs
+  when: zot_storage_device
+
+- name: Ensure the image store volume is mounted
+  ansible.posix.mount:
+    path: "{{ zot_storage_root }}"
+    src: "{{ zot_storage_device }}"
+    fstype: xfs
+    opts: defaults,noatime
+    state: mounted
+  when: zot_storage_device
+
+- name: Grow the image store filesystem if necessary
+  # community.general.filesystem cannot grow XFS filesystems unless they are already
+  # mounted, hence this additional invocation after ansible.posix.mount.
+  community.general.filesystem:
+    dev: "{{ zot_storage_device }}"
+    fstype: xfs
+    resizefs: yes
+  when: zot_storage_device
+
+- name: Ensure the image store is owned by the zot user
+  ansible.builtin.file:
+    path: "{{ zot_storage_root }}"
+    state: directory
+    owner: "{{ zot_user }}"
+    group: "{{ zot_user }}"
+    mode: "0750"

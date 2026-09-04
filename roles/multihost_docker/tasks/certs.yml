@@ -1,0 +1,73 @@
+---
+
+# Deploy the fleet's pre-generated TLS material to this worker.
+
+- name: Assert a registry address is configured
+  ansible.builtin.assert:
+    that:
+      - multihost_docker_registry is defined
+      - multihost_docker_registry | length > 0
+      - "'REPLACE_ME' not in multihost_docker_registry"
+    fail_msg: >-
+      multihost_docker_registry is still the placeholder. Set it to the zot registry's
+      host:port; it names the certs.d directory and must match cmgr_registry on the
+      orchestrator.
+
+- name: Ensure Docker TLS certificate directory exists
+  ansible.builtin.file:
+    path: "{{ tls_cert_path }}"
+    state: directory
+    mode: "0700"
+
+- name: Ensure registry certs.d directory exists
+  ansible.builtin.file:
+    path: "{{ registry_certs_d_path }}"
+    state: directory
+    mode: "0700"
+
+# dockerd server material (docker-ca domain). Land at the paths daemon.json.j2
+# already references so no template edit is needed. A change bounces dockerd.
+
+- name: Deploy docker CA certificate (verify cmgrd client cert)
+  ansible.builtin.copy:
+    src: "{{ multihost_docker_cert_src }}/docker-ca-cert.pem"
+    dest: "{{ ca_cert_path }}"
+    mode: "0444"
+  notify:
+    - Restart Docker
+
+- name: Deploy shared worker server certificate (SAN academy-docker-worker)
+  ansible.builtin.copy:
+    src: "{{ multihost_docker_cert_src }}/docker-server-cert.pem"
+    dest: "{{ server_cert_path }}"
+    mode: "0444"
+  notify:
+    - Restart Docker
+
+- name: Deploy shared worker server key
+  ansible.builtin.copy:
+    src: "{{ multihost_docker_cert_src }}/docker-server-key.pem"
+    dest: "{{ server_key_path }}"
+    mode: "0400"
+  notify:
+    - Restart Docker
+
+# zot pull material (zot-ca domain), under /etc/docker/certs.d/<registry>/.
+
+- name: Deploy zot CA certificate (verify zot server cert)
+  ansible.builtin.copy:
+    src: "{{ multihost_docker_cert_src }}/zot-ca-cert.pem"
+    dest: "{{ registry_certs_d_path }}/ca.crt"
+    mode: "0444"
+
+- name: Deploy worker registry client certificate (zot read-only)
+  ansible.builtin.copy:
+    src: "{{ multihost_docker_cert_src }}/zot-worker-cert.pem"
+    dest: "{{ registry_certs_d_path }}/client.cert"
+    mode: "0444"
+
+- name: Deploy worker registry client key
+  ansible.builtin.copy:
+    src: "{{ multihost_docker_cert_src }}/zot-worker-key.pem"
+    dest: "{{ registry_certs_d_path }}/client.key"
+    mode: "0400"

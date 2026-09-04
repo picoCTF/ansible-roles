@@ -1,0 +1,36 @@
+---
+
+- include_tasks: clean-upgrade.yml
+  when: (upgrade | bool) and (clean_upgrade | bool)
+  args:
+    apply:
+      become: yes
+
+- include_tasks: install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: certs.yml
+  when: cork_deploy_certs | bool
+  args:
+    apply:
+      become: yes
+
+- include_tasks: service.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: artifact-server-install.yml
+  args:
+    apply:
+      become: yes
+
+- include_tasks: artifact-server-service.yml
+  when: artifact_server_service_enabled | bool
+  args:
+    apply:
+      become: yes
+
+- ansible.builtin.meta: flush_handlers

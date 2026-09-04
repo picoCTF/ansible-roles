@@ -1,0 +1,27 @@
+---
+
+# Configure zot to run as a systemd service.
+
+- name: Ensure zot systemd unit exists
+  ansible.builtin.template:
+    src: "zot.service.j2"
+    dest: "{{ systemd_unit_dir }}/zot.service"
+    lstrip_blocks: yes
+    force: yes
+  register: zot_unit
+  notify:
+    - Reload systemd config
+
+- name: Ensure zot service is enabled and started
+  ansible.builtin.systemd:
+    name: zot.service
+    daemon_reload: yes
+    enabled: yes
+    state: started
+
+- name: Determine whether to restart zot
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart zot
+  when: zot_unit.changed

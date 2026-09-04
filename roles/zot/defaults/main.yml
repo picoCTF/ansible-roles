@@ -1,0 +1,21 @@
+---
+zot_version: "v2.1.18"
+zot_checksum: ""
+
+zot_service_enabled: yes
+zot_address: "0.0.0.0"
+zot_port: "5000"
+zot_log_level: "warning"
+
+# Service account zot runs as. Created by the role: a system user with no login shell that
+# owns the image store.
+zot_user: "zot"
+
+# Image store. When zot_storage_device is set, that block device is formatted as XFS and
+# mounted at zot_storage_root before zot starts, so the store lives on its own volume
+# rather than the root filesystem.
+zot_storage_root: "/var/lib/zot"
+zot_storage_device: null
+
+zot_deploy_certs: yes
+zot_cert_src: "./docker-certs"

@@ -1,0 +1,12 @@
+---
+zot_install_path: "/usr/bin/zot"
+zot_config_dir: "/etc/zot"
+zot_binary_filename: "zot-linux-amd64"
+zot_download_url: "https://github.com/project-zot/zot/releases/download/{{ zot_version }}/{{ zot_binary_filename }}"
+
+# Records the URL the installed binary came from. zot has no version flag (its CLI is
+# only `serve` and `verify`), so this stands in for the version probe the other roles
+# run against their binary.
+zot_install_marker: "{{ zot_config_dir }}/.installed-source"
+
+systemd_unit_dir: "/etc/systemd/system/"

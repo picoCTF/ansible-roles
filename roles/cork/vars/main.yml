@@ -1,0 +1,10 @@
+---
+challenge_dir: "/challenges"
+install_location: "/usr/local/bin"
+cork_binaries_filename: "cmgr_linux_amd64.tar.gz"
+
+registry_certs_d_path: "/etc/docker/certs.d/{{ cmgr_registry }}"
+
+systemd_unit_dir: "/etc/systemd/system/"
+
+artifact_server_binary_filename: "cmgr-artifact-server_linux_amd64.tar.gz"

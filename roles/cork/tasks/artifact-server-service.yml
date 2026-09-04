@@ -1,0 +1,32 @@
+---
+
+# Configure cmgr-artifact-server to run as a systemd service.
+
+- name: Ensure artifact directory exists and is root-only
+  ansible.builtin.file:
+    path: "{{ cmgr_artifact_dir }}"
+    state: directory
+    mode: "0770"
+
+- name: Ensure artifact server systemd unit exists
+  ansible.builtin.template:
+    src: "cmgr_artifact_server.service.j2"
+    dest: "{{ systemd_unit_dir }}/cmgr_artifact_server.service"
+    lstrip_blocks: yes
+    force: yes
+  register: cmgr_artifact_server_unit
+  notify:
+    - Reload systemd config
+
+- name: Ensure systemd unit is enabled
+  ansible.builtin.systemd:
+    name: cmgr_artifact_server.service
+    daemon_reload: yes
+    enabled: yes
+
+- name: Determine whether to restart cmgr artifact server
+  ansible.builtin.assert: { that: true, quiet: true }
+  changed_when: true
+  notify:
+    - Restart cmgr artifact server
+  when: artifact_server_installation_required or cmgr_artifact_server_unit.changed

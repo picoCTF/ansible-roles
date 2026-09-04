@@ -1,0 +1,30 @@
+[Unit]
+Description=cork worker telemetry agent
+Documentation=https://github.com/CyLabAcademy/cork-telemetry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={{ cork_telemetry_install_path }}/{{ cork_telemetry_binary_filename }}
+Environment=TELEMETRY_PORT={{ worker_telemetry_port }}
+Restart=always
+RestartSec=1
+
+# Runs as a throwaway unprivileged user; the agent only reads /proc and
+# serves HTTP, so it needs no state, no home, and no capabilities.
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# Do NOT set ProcSubset=pid: it hides /proc/stat and /proc/meminfo,
+# which are the agent's only data sources.
+
+[Install]
+WantedBy=multi-user.target

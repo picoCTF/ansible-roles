@@ -1,0 +1,43 @@
+{
+    "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:{{ worker_docker_port }}"],
+    "tlsverify": true,
+    "tlscacert": "{{ ca_cert_path }}",
+    "tlscert": "{{ server_cert_path }}",
+    "tlskey": "{{ server_key_path }}",
+
+    {% if storage_quotas %}
+    "data-root": "{{ storage_mount_point }}",
+    {% endif %}
+    "storage-driver": "overlay2",
+
+    "cgroup-parent": "{{ parent_cgroup }}",
+    "exec-opts": ["native.cgroupdriver=systemd"],
+
+    "default-address-pools": [
+        {% for pool in network_ip_pools %}
+        {"base": "{{ pool }}", "size": {{ network_prefix_length }}}{{ "," if not loop.last }}
+        {% endfor %}
+    ],
+
+    {% if userns_remap_enabled %}
+    "userns-remap": "default",
+    {% endif %}
+
+    {% if oci_interceptor_enabled %}
+    "default-runtime": "oci-interceptor",
+    "runtimes": {
+        "oci-interceptor": {
+            "path": "{{ oci_interceptor_install_path }}/oci-interceptor",
+            "runtimeArgs": {{ oci_interceptor_flags | to_json }}
+        }
+    },
+    {% endif %}
+
+    "log-driver": "local",
+    "log-opts": {
+        "max-size": "{{ logs_max_size }}",
+        "max-file": "{{ logs_max_files }}"
+    },
+
+    "containerd": "/run/containerd/containerd.sock"
+}

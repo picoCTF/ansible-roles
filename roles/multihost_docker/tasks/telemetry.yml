@@ -1,0 +1,75 @@
+---
+
+# Install the cork-telemetry health agent and its systemd unit.
+#
+# cmgrd polls http://<worker>:2136/health every 500ms and expects a 200 with a
+# JSON body {"overloaded": <bool>} (cmgr/workers.go pollTelemetry). The endpoint
+# is plain HTTP by design — it carries no secret and needs no TLS — so there are
+# no certs to deploy here.
+#
+# The release asset is a single static executable, so there is nothing to unpack.
+# The agent exposes no version flag either, so there is no installed-version probe
+# to compare against; a version change requires cork_telemetry_upgrade.
+
+- name: Check whether cork-telemetry is installed
+  ansible.builtin.stat:
+    path: "{{ cork_telemetry_install_path }}/{{ cork_telemetry_binary_filename }}"
+  register: cork_telemetry_binary
+
+- name: Determine latest cork-telemetry version
+  ansible.builtin.uri:
+    url: "{{ cork_telemetry_github_url }}/releases/latest"
+    method: HEAD
+    follow_redirects: safe
+  register: cork_telemetry_latest_version_response
+  when: cork_telemetry_version == "latest" and (not cork_telemetry_binary.stat.exists or (cork_telemetry_upgrade | bool))
+
+- name: Determine whether (re-)installation is necessary
+  ansible.builtin.set_fact:
+    cork_telemetry_installation_required: "{{ (not cork_telemetry_binary.stat.exists) or (cork_telemetry_upgrade | bool) }}"
+
+- name: Create temporary directory for download
+  ansible.builtin.tempfile:
+    state: directory
+  register: cork_telemetry_download_dir
+  when: cork_telemetry_installation_required
+
+- name: Download cork-telemetry binary
+  ansible.builtin.get_url:
+    dest: "{{ cork_telemetry_download_dir.path }}/{{ cork_telemetry_binary_filename }}"
+    url: "{{ cork_telemetry_github_url }}/releases/download/{{ cork_telemetry_latest_version_response.url.split('/tag/')[1] if cork_telemetry_version == 'latest' else cork_telemetry_version }}/{{ cork_telemetry_binary_filename }}"
+  when: cork_telemetry_installation_required
+
+- name: Copy cork-telemetry binary to install location
+  ansible.builtin.copy:
+    src: "{{ cork_telemetry_download_dir.path }}/{{ cork_telemetry_binary_filename }}"
+    dest: "{{ cork_telemetry_install_path }}/{{ cork_telemetry_binary_filename }}"
+    mode: "0755"
+    remote_src: yes
+  when: cork_telemetry_installation_required
+  notify:
+    - Restart telemetry service
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ cork_telemetry_download_dir.path }}"
+    state: absent
+  when: cork_telemetry_installation_required
+
+- name: Ensure telemetry.service systemd unit exists
+  ansible.builtin.template:
+    src: "telemetry.service.j2"
+    dest: "{{ systemd_unit_dir }}/telemetry.service"
+    lstrip_blocks: yes
+    force: yes
+  register: telemetry_service_unit
+  notify:
+    - Reload systemd config
+    - Restart telemetry service
+
+- name: Ensure telemetry.service unit is enabled and started
+  ansible.builtin.systemd:
+    name: telemetry.service
+    daemon_reload: yes
+    enabled: yes
+    state: started
