@@ -1,13 +1,4 @@
 ---
-- name: Update GRUB
-  ansible.builtin.command:
-    cmd: update-grub
-  become: yes
-
-- name: Reboot
-  ansible.builtin.reboot:
-  become: yes
-
 - name: Reload systemd config
   systemd:
     daemon_reload: yes
@@ -34,4 +25,16 @@
   ansible.builtin.service:
     name: docker_reaper.timer
     state: restarted
+  become: yes
+
+- name: Apply Docker cgroup quota
+  ansible.builtin.service:
+    name: docker_cgroup_quota.service
+    state: restarted
+  become: yes
+
+- name: Reload container egress filter
+  ansible.builtin.systemd:
+    name: "{{ nft_egress_service }}"
+    state: reloaded
   become: yes

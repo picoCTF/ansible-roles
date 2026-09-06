@@ -1,27 +1,64 @@
 ---
 
-# Defines a custom parent cgroup for spawned containers, limiting
-# total resource consumption to 90% of available CPU and memory.
+# Defines a custom parent cgroup for spawned containers and bounds their total
+# resource consumption.
+#
+# Memory is sized from the host's own requirements rather than as a percentage
+# of RAM: the Docker control plane (dockerd, containerd, and one
+# containerd-shim-runc-v2 per running container) sits in system.slice, outside
+# the container slice, and grows with container count. See the sizing block in
+# defaults/main.yml.
+#
+# Ceilings are recomputed at boot by docker_cgroup_quota.service so a resized
+# instance stays correct without re-running Ansible.
 
-# Enables memory and swap accounting (typically disabled by default
-# on Debian-based systems) in order to support memory limits.
-
-- name: Check if 50-cloudimg-settings GRUB config exists
-  # Ubuntu cloud images use an /etc/default/grub.d/50-cloudimg-settings.cfg
-  # config override file rather than the usual /etc/default/grub
+- name: Detect cgroup hierarchy version
+  # cgroup.controllers exists only on the unified (v2) hierarchy.
   ansible.builtin.stat:
-    path: "{{ grub_cloudimg_config_path }}"
-  register: grub_cloudimg_config
+    path: /sys/fs/cgroup/cgroup.controllers
+  register: cgroup_v2_marker
 
-- name: Ensure memory cgroup and swap accounting are enabled
-  ansible.builtin.lineinfile:
-    dest: "{{ grub_cloudimg_config_path if grub_cloudimg_config.stat.exists else '/etc/default/grub' }}"
-    regexp: '^(GRUB_CMDLINE_LINUX_DEFAULT=(?!.*cgroup_enable=memory swapaccount=1).*)\"$'
-    line: '\1 cgroup_enable=memory swapaccount=1"'
-    backrefs: yes
-  notify:
-    - Update GRUB
-    - Reboot
+# Every host-protection directive this role sets -- CPUWeight, MemorySwapMax,
+# MemoryMin, MemoryLow -- exists only on the unified hierarchy. On cgroup v1
+# systemd silently ignores them and the worker would end up with just MemoryMax,
+# CPUQuota and TasksMax: none of the scheduler priority, host memory reserve or
+# swap suppression this role is built around. Fail rather than degrade quietly.
+# Both releases the role supports (jammy, noble) are unified by default.
+- name: Verify the host uses the unified cgroup hierarchy
+  ansible.builtin.assert:
+    that:
+      - cgroup_v2_marker.stat.exists
+    fail_msg: >-
+      /sys/fs/cgroup/cgroup.controllers is absent, so this host is on the cgroup v1
+      (legacy or hybrid) hierarchy. The container and host memory protections this
+      role configures are cgroup v2 only and would be silently ignored. Boot with
+      systemd.unified_cgroup_hierarchy=1, or use a supported release (jammy, noble).
+    success_msg: "Unified cgroup hierarchy in use."
+
+- name: Read the kernel thread ceiling
+  # kernel.threads-max is RAM-derived and is what the aggregate TasksMax is sized
+  # against; it is not exposed as an Ansible fact.
+  ansible.builtin.slurp:
+    src: /proc/sys/kernel/threads-max
+  register: kernel_threads_max_raw
+
+- name: Record the kernel thread ceiling
+  ansible.builtin.set_fact:
+    kernel_threads_max: "{{ kernel_threads_max_raw.content | b64decode | trim | int }}"
+
+- name: Verify the host is large enough for the configured container capacity
+  ansible.builtin.assert:
+    that:
+      - (ansible_memtotal_mb | int) - (container_slice_host_reserve_mb | int) >= (container_slice_min_mb | int)
+    fail_msg: >-
+      {{ ansible_memtotal_mb }}MiB of RAM less a {{ container_slice_host_reserve_mb | int }}MiB host
+      reserve leaves under {{ container_slice_min_mb }}MiB for containers. Lower
+      container_slice_target_containers (effective capacity
+      {{ container_slice_capacity | int }}) or use a larger instance.
+    success_msg: >-
+      {{ (ansible_memtotal_mb | int) - (container_slice_host_reserve_mb | int) }}MiB available to
+      {{ parent_cgroup }} for {{ container_slice_capacity | int }} containers
+      ({{ ansible_memtotal_mb }}MiB total less a {{ container_slice_host_reserve_mb | int }}MiB host reserve).
 
 - name: Ensure custom container parent cgroup exists
   ansible.builtin.template:
@@ -30,3 +67,63 @@
     force: yes
   notify:
     - Reload systemd config
+    # The boot script's --runtime drop-in in /run/systemd/system.control/ outranks
+    # this file, so a stale one from the last boot would keep overriding the
+    # properties it sets. Re-run it whenever the slice changes.
+    - Apply Docker cgroup quota
+
+# Capping the container slice bounds what containers may allocate; it does not
+# stop the kernel reclaiming dockerd, containerd and sshd pages to satisfy those
+# allocations. These reserves are what keep the worker reachable under load.
+# A daemon-reload realises them on the already-running slices; no restart needed.
+- name: Ensure system.slice drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ system_slice_drop_in_dir }}"
+    state: directory
+
+- name: Ensure system.slice memory reserve drop-in exists
+  ansible.builtin.template:
+    src: "system_slice_reserve.conf.j2"
+    dest: "{{ system_slice_drop_in_dir }}/10-memory-reserve.conf"
+    force: yes
+  notify:
+    - Reload systemd config
+
+- name: Ensure user.slice drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ user_slice_drop_in_dir }}"
+    state: directory
+
+# Interactive ssh sessions live in user.slice, which the system.slice reserve
+# does not cover.
+- name: Ensure user.slice memory reserve drop-in exists
+  ansible.builtin.template:
+    src: "user_slice_reserve.conf.j2"
+    dest: "{{ user_slice_drop_in_dir }}/10-memory-reserve.conf"
+    force: yes
+  notify:
+    - Reload systemd config
+
+- name: Ensure boot-time cgroup ceiling script exists
+  ansible.builtin.template:
+    src: "docker_cgroup_quota.sh.j2"
+    dest: "{{ container_slice_quota_script_path }}"
+    mode: "0755"
+    force: yes
+  notify:
+    - Apply Docker cgroup quota
+
+- name: Ensure boot-time cgroup ceiling unit exists
+  ansible.builtin.template:
+    src: "docker_cgroup_quota.service.j2"
+    dest: "{{ systemd_unit_dir }}/docker_cgroup_quota.service"
+    force: yes
+  notify:
+    - Reload systemd config
+    - Apply Docker cgroup quota
+
+- name: Ensure boot-time cgroup ceiling unit is enabled
+  ansible.builtin.systemd:
+    name: docker_cgroup_quota.service
+    daemon_reload: yes
+    enabled: yes

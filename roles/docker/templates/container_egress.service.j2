@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+#
+# Loads the container egress denials into nftables at boot, and on every
+# `nft -f` this role performs when the CIDR list changes.
+#
+# Unlike the iptables backend's ufw rules, this needs no ordering against
+# docker.service: the table stands on its own rather than inserting into a
+# chain Docker creates, so it is loaded before Docker starts and survives
+# every Docker restart, reload and network create untouched.
+
+[Unit]
+Description=Reject container egress to denied CIDRs (nftables)
+Documentation=https://github.com/picoCTF/ansible-roles
+After=network-pre.target
+Before=network.target docker.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f {{ nft_egress_conf_path }}
+ExecReload=/usr/sbin/nft -f {{ nft_egress_conf_path }}
+# Leading '-' so a stop on a host where the table is already gone is not a
+# failure: the unit is a loader, and an absent table is the state it wants.
+ExecStop=-/usr/sbin/nft delete table inet {{ nft_egress_table }}
+
+[Install]
+WantedBy=multi-user.target

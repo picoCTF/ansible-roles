@@ -1,0 +1,15 @@
+[Unit]
+Description=Compute docker cgroup resource ceilings on startup
+Documentation=https://github.com/picoCTF/ansible-roles
+# Ordering only. The reverse dependency (docker.service pulling this unit in)
+# lives in a docker.service drop-in, so dockerd cannot start ahead of the
+# ceilings even when started manually or via socket activation.
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart={{ container_slice_quota_script_path }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+#!/usr/sbin/nft -f
+#
+# {{ ansible_managed }}
+#
+# Container egress denials for hosts running Docker's nftables firewall
+# backend, where there is no DOCKER-USER chain to insert into: docker 29 in
+# that mode creates `table ip docker-bridges` and `table ip6 docker-bridges`
+# and nothing else, so the ufw after.rules approach used on the iptables
+# backend has nothing to attach to and silently stops filtering.
+#
+# The three lines below are the standard atomic-replace idiom: `add` is a
+# no-op when the table exists, so the `delete` always has a table to remove
+# and the whole file loads as one transaction. Without it a reload would
+# append a second copy of every rule.
+add table inet {{ nft_egress_table }}
+delete table inet {{ nft_egress_table }}
+
+table inet {{ nft_egress_table }} {
+    chain forward {
+        # Deliberately far below any priority Docker registers for its own
+        # forward chains: base chains run in priority order and a reject
+        # verdict here ends the packet's journey, so this chain is evaluated
+        # before Docker can accept the traffic. Docker's own priority is an
+        # implementation detail that has moved between releases; this does not
+        # depend on it.
+        type filter hook forward priority -300; policy accept;
+
+{% for cidr in container_deny_ipv4_cidrs %}
+        ip daddr {{ cidr }} reject comment "Ansible managed"
+{% endfor %}
+{% for cidr in container_deny_ipv6_cidrs %}
+        ip6 daddr {{ cidr }} reject comment "Ansible managed"
+{% endfor %}
+    }
+}

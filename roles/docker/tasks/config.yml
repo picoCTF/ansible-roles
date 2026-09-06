@@ -18,6 +18,20 @@
     - Reload systemd config
     - Restart Docker
 
+# Ordering only: docker_cgroup_quota.service is Before=docker.service, but nothing
+# pulls it in, so a manual `systemctl restart docker` or socket activation could
+# bring dockerd up ahead of the cgroup ceilings. Deliberately does NOT notify
+# "Restart Docker" -- ordering takes effect at the next start of docker.service,
+# and these workers do not enable live-restore, so a restart would kill every
+# running challenge container for no benefit.
+- name: Ensure docker.service depends on the cgroup ceiling unit
+  ansible.builtin.copy:
+    src: "docker_cgroup_quota_ordering.conf"
+    dest: "{{ systemd_docker_drop_in_dir }}/10-cgroup-quota.conf"
+    force: yes
+  notify:
+    - Reload systemd config
+
 - name: Ensure daemon config file exists
   ansible.builtin.template:
     src: "daemon.json.j2"
