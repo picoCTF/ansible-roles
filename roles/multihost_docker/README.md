@@ -216,7 +216,7 @@ plain HTTP.
 | `docker_reaper_enabled` | Whether to run `docker-reaper` as a scheduled systemd service. | `yes` |
 | `docker_reaper_version` | The version of `docker-reaper` to run. | `latest` |
 | `docker_reaper_upgrade` | Whether to upgrade `docker-reaper` if already installed. | `no` |
-| `docker_reaper_command` | Container/network sweep arguments. Runs as the unit's first `ExecStart`. | `containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks` |
+| `docker_reaper_command` | Container/network sweep arguments. Runs as the unit's first `ExecStart`. Must not outlive `cmgr_prune_age` in the `cork` role, or cmgrd keeps serving instances whose containers are already gone. | `containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks` |
 | `docker_reaper_images_command` | Image sweep arguments, run as a second `ExecStart` after the container sweep. Requires docker-reaper ≥ v1.2.0, which introduced the `images` subcommand. | `images --threshold 80 --target 70` |
 | `docker_reaper_shims_command` | Orphaned containerd shim sweep, run as a third `ExecStart` after the image sweep. Signals processes as root, so it is worth understanding before enabling: a shim is only signalled once its container is absent from the daemon's full container list. Requires docker-reaper ≥ `docker_reaper_shims_min_version`; omitted with a warning on older binaries. Empty string disables. | `shims --min-age 5m` |
 | `docker_reaper_shims_min_version` | Lowest docker-reaper version providing the `shims` subcommand. Below this the third `ExecStart` is omitted, because an unknown subcommand would fail the unit on every timer tick. | `1.3.0` |

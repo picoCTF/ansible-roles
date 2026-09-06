@@ -60,7 +60,7 @@ unset are omitted from the unit entirely, so cork's own defaults apply.
 | cmgr_registry_cert_dir | `CMGR_REGISTRY_CERT_DIR`. | unset |
 | cmgr_ports | `CMGR_PORTS`, e.g. `49152-65535`. Consider pairing with the `os` role's `ephemeral_port_range`. | unset |
 | cmgr_concurrent_launches | `CMGR_CONCURRENT_LAUNCHES` (1 or 2). | unset |
-| cmgr_prune_age | `CMGR_PRUNE_AGE`, e.g. `1h`. | unset |
+| cmgr_prune_age | `CMGR_PRUNE_AGE`. Must not exceed the `multihost_docker` role's container sweep age (currently `30m`); a longer value leaves cmgrd serving instances whose containers docker-reaper has already removed. Nothing validates the pair. | `30m` |
 | cmgr_db_wal | `CMGR_DB_WAL` (`false`/`off`/`0` to disable). | unset |
 | cmgr_enable_disk_quotas | `CMGR_ENABLE_DISK_QUOTAS`. | unset |
 | cmgr_extra_environment_vars | Extra environment variables for the cmgrd service, as a string map. | `{}` |

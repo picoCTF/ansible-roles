@@ -74,7 +74,7 @@ docker_firewall_backend: nftables
 docker_reaper_enabled: yes
 docker_reaper_version: "latest"
 docker_reaper_upgrade: no
-docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks"
+docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks"
 docker_reaper_images_command: "images --threshold 80 --target 70"
 # Sweeps containerd shims left behind by containers that no longer exist, which
 # otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once
