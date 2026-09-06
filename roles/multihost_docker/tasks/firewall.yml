@@ -23,6 +23,17 @@
 - name: Configure container egress denials on the iptables backend
   when: docker_firewall_backend == "iptables"
   block:
+    # Restores the distro default. On this backend Docker's own ACCEPT rules make
+    # ufw's FORWARD policy irrelevant to container traffic, so DROP is both the
+    # status quo and the safer setting to leave behind if a host is moved back
+    # from the nftables backend.
+    - name: Ensure ufw's forwarded-traffic policy is the distro default
+      community.general.ufw:
+        policy: deny
+        direction: routed
+      notify:
+        - Reload ufw
+
     - name: Ensure ufw.service drop-in directory exists
       ansible.builtin.file:
         path: "{{ systemd_ufw_drop_in_dir }}"
@@ -80,6 +91,29 @@
 - name: Configure container egress denials on the nftables backend
   when: docker_firewall_backend == "nftables"
   block:
+    # On the iptables backend Docker inserts its own ACCEPT rules into the same
+    # `filter` table ufw writes to, so ufw's FORWARD policy of DROP never applies
+    # to container traffic. On the nftables backend Docker's rules move to
+    # `table ip docker-bridges` and ufw's FORWARD chain still has `policy drop`,
+    # which silently kills ALL container egress -- measured on Docker 29.8: a
+    # container could not reach 8.8.8.8 until this was relaxed. The container
+    # egress denials are enforced by this role's own inet table, not by ufw's
+    # default, so allowing routed traffic here loses nothing.
+    #
+    # Note the scope: this is ufw's GLOBAL routed policy, not a docker-only rule.
+    # ufw has no stable handle for Docker's bridges -- user-defined networks get a
+    # br-<id> interface created at runtime -- so there is nothing to scope to at
+    # deploy time. That is acceptable on a single-purpose worker, which forwards
+    # nothing but container traffic. A host that also routes for something else
+    # (a second NIC, a VPN) needs a narrower rule instead: `ufw route allow` from
+    # the container address pools in network_ip_pools.
+    - name: Ensure ufw does not drop forwarded container traffic
+      community.general.ufw:
+        policy: allow
+        direction: routed
+      notify:
+        - Reload ufw
+
     - name: Ensure the nftables include directory exists
       ansible.builtin.file:
         path: "{{ nft_egress_conf_path | dirname }}"
