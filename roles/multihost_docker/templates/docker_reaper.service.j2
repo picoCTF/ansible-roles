@@ -9,6 +9,9 @@ ConditionArchitecture=x86-64
 Type=oneshot
 ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_command }}
 ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_images_command }}
+{% if docker_reaper_shims_command and docker_reaper_shims_supported | default(false) | bool %}
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_shims_command }}
+{% endif %}
 
 [Install]
 WantedBy=multi-user.target

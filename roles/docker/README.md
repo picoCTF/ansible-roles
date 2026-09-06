@@ -174,7 +174,7 @@ This is [configurable](#firewall-settings), and additional IPs can be blocked if
 | `oci_interceptor_enabled` | Whether to use the `oci-interceptor` runtime wrapper. | `true` |
 | `oci_interceptor_version` | Version of `oci-interceptor` to install. | `latest` |
 | `oci_interceptor_upgrade` | Whether to upgrade `oci-interceptor` if already installed. | `false` |
-| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. | `["--oi-readonly-networking-mounts"]` |
+| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. Must be a **list**; they are rendered shell-quoted into an exec'ing wrapper script (`/usr/local/bin/oci-interceptor-runtime`) rather than into `daemon.json` `runtimeArgs`. Docker generates its own non-exec wrapper for any runtime with a non-empty `runtimeArgs`, which then sits between the containerd shim and the runtime and leaks a containerd shim whenever a runtime call is cancelled. | `["--oi-readonly-networking-mounts"]` |
 
 ### Logging settings
 

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Invoked by dockerd as the OCI runtime for challenge containers.
+#
+# The interceptor's flags live HERE rather than in daemon.json's runtimeArgs.
+# Docker generates its own wrapper for any runtime that has a non-empty
+# runtimeArgs, and that generated wrapper does not exec:
+#
+#     #!/bin/sh
+#     /usr/local/bin/oci-interceptor --flags $@
+#
+# It therefore remains in the process tree between the containerd shim and the
+# real runtime. containerd invokes the runtime through go-runc, which builds
+# commands with Go's exec.CommandContext; a cancelled or timed-out call delivers
+# SIGKILL to the direct child only -- that shell -- orphaning runc beneath it.
+# For a `runc delete` the task is then never deleted and its
+# containerd-shim-runc-v2 never shuts down, leaking ~5 MiB per occurrence until
+# the host is rebooted.
+#
+# exec'ing here, with runtimeArgs omitted from daemon.json, keeps the chain a
+# single process from shim to runc.
+#
+# Two things not to change:
+#   - Do not move these flags back into daemon.json runtimeArgs.
+#   - Keep "$@" quoted. Docker's generated wrapper uses a bare $@, which
+#     word-splits and glob-expands its arguments.
+{# A bare string would be iterated character by character by map('quote'), producing
+   one argv entry per character. dockerd would still start and every container create
+   would then fail, so normalise rather than rendering something that looks valid. #}
+{% set flags = [oci_interceptor_flags] if oci_interceptor_flags is string else oci_interceptor_flags %}
+exec {{ oci_interceptor_install_path }}/oci-interceptor {{ flags | map('quote') | join(' ') }} "$@"
