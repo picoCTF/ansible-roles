@@ -26,11 +26,18 @@
     {% endif %}
 
     {% if oci_interceptor_enabled %}
+    {#
+      runtimeArgs is deliberately omitted. Docker generates its own non-exec /bin/sh
+      wrapper for any runtime with a non-empty runtimeArgs, and that shell sits between
+      the containerd shim and the runtime; a cancelled runtime call then SIGKILLs the
+      shell and orphans runc, leaking a containerd shim (~5 MiB) per occurrence until
+      reboot. The interceptor's flags live in oci_interceptor_runtime.sh.j2, which execs.
+      An absent (or empty) runtimeArgs produces no generated wrapper.
+    #}
     "default-runtime": "oci-interceptor",
     "runtimes": {
         "oci-interceptor": {
-            "path": "{{ oci_interceptor_install_path }}/oci-interceptor",
-            "runtimeArgs": {{ oci_interceptor_flags | to_json }}
+            "path": "{{ oci_interceptor_wrapper_path }}"
         }
     },
     {% endif %}

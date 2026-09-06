@@ -81,6 +81,44 @@ TLS unconditionally, so there is no option to disable it.
 | `cork_telemetry_upgrade` | Whether to upgrade `cork-telemetry` if already installed. The agent has no version flag, so the role cannot detect drift on its own — pinning a different `cork_telemetry_version` only takes effect with this set. | `no` |
 | `cork_telemetry_github_url` | GitHub repo to download `cork-telemetry` from. | `https://github.com/CyLabAcademy/cork-telemetry` |
 
+### OCI runtime wrapper
+
+`dockerd` is configured with `oci-interceptor` as its `default-runtime`, but it points at
+a wrapper script this role deploys (`/usr/local/bin/oci-interceptor-runtime`, from
+`templates/oci_interceptor_runtime.sh.j2`) rather than at the binary,
+and `daemon.json` carries **no** `runtimeArgs`. This is deliberate and load-bearing.
+
+Docker generates its own wrapper for any runtime with a non-empty `runtimeArgs`, and that
+generated wrapper does not `exec`:
+
+```sh
+#!/bin/sh
+/usr/local/bin/oci-interceptor --flags $@
+```
+
+It therefore stays in the process tree between the containerd shim and the real runtime.
+containerd invokes the runtime through go-runc, which builds commands with Go's
+`exec.CommandContext`; a cancelled or timed-out call delivers SIGKILL to the direct child
+only — that shell — orphaning `runc` beneath it. For a `runc delete` the task is then
+never deleted and its `containerd-shim-runc-v2` never shuts down, leaking roughly 5 MiB
+per occurrence until the host is rebooted. On a small worker that accumulates into
+host-wide OOM kills.
+
+Our wrapper `exec`s, which removes Docker's generated layer. Note that this is only half
+the fix: the interceptor itself spawning rather than exec'ing `runc` is a second,
+independent non-exec layer, so the chain from shim to `runc` is a single process **only
+once oci-interceptor >= `oci_interceptor_min_version` is installed**. Below that the role
+warns on every apply, and shims keep leaking. Set the
+interceptor's flags via `oci_interceptor_flags` as usual — they are rendered into the
+wrapper (shell-quoted) rather than into `daemon.json`.
+
+**Do not move the flags back into `daemon.json` `runtimeArgs`.** The regression is silent:
+containers keep working and the leak only surfaces as memory pressure days later. An
+absent or empty `runtimeArgs` produces no generated wrapper; a non-empty one does.
+
+Note that changing either file restarts `dockerd`, which stops running containers
+(`live-restore` is not enabled). Drain a worker before applying.
+
 ### Firewall settings
 
 | Name | Description | Default |
@@ -161,7 +199,8 @@ plain HTTP.
 | `oci_interceptor_enabled` | Whether to use the `oci-interceptor` runtime wrapper. | `true` |
 | `oci_interceptor_version` | Version of `oci-interceptor` to install. | `latest` |
 | `oci_interceptor_upgrade` | Whether to upgrade `oci-interceptor` if already installed. | `false` |
-| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. | `["--oi-readonly-networking-mounts"]` |
+| `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. Must be a **list**; they are rendered shell-quoted into the runtime wrapper rather than into `daemon.json`. | `["--oi-readonly-networking-mounts"]` |
+| `oci_interceptor_min_version` | Lowest oci-interceptor version that `exec`s the runtime rather than spawning it. Below this the role warns on every apply: the runtime wrapper alone does not stop shims leaking. Not enforced, since an older binary otherwise works. | `0.3.0` |
 
 ### Logging settings
 
@@ -177,6 +216,8 @@ plain HTTP.
 | `docker_reaper_enabled` | Whether to run `docker-reaper` as a scheduled systemd service. | `yes` |
 | `docker_reaper_version` | The version of `docker-reaper` to run. | `latest` |
 | `docker_reaper_upgrade` | Whether to upgrade `docker-reaper` if already installed. | `no` |
-| `docker_reaper_command` | Container/network sweep arguments. Runs as the unit's first `ExecStart`. | `containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks` |
+| `docker_reaper_command` | Container/network sweep arguments. Runs as the unit's first `ExecStart`. Must not outlive `cmgr_prune_age` in the `cork` role, or cmgrd keeps serving instances whose containers are already gone. | `containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks` |
 | `docker_reaper_images_command` | Image sweep arguments, run as a second `ExecStart` after the container sweep. Requires docker-reaper ≥ v1.2.0, which introduced the `images` subcommand. | `images --threshold 80 --target 70` |
+| `docker_reaper_shims_command` | Orphaned containerd shim sweep, run as a third `ExecStart` after the image sweep. Signals processes as root, so it is worth understanding before enabling: a shim is only signalled once its container is absent from the daemon's full container list. Requires docker-reaper ≥ `docker_reaper_shims_min_version`; omitted with a warning on older binaries. Empty string disables. | `shims --min-age 5m` |
+| `docker_reaper_shims_min_version` | Lowest docker-reaper version providing the `shims` subcommand. Below this the third `ExecStart` is omitted, because an unknown subcommand would fail the unit on every timer tick. | `1.3.0` |
 | `docker_reaper_interval_secs` | How frequently (in seconds) to run `docker-reaper`. | `60` |

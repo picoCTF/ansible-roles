@@ -58,6 +58,50 @@
     state: absent
   when: docker_reaper_installation_required
 
+# The shims subcommand only exists from a certain release onward, and
+# docker_reaper_upgrade defaults to no, so a worker may still be running an older
+# binary. Rendering the ExecStart unconditionally would fail the unit on every timer
+# tick (the container and image sweeps still run, since shims is ordered last).
+# check_mode: false because ansible.builtin.command is skipped under --check without
+# creates/removes, leaving stdout empty; failed_when: false because this task runs after
+# config.yml has already rewritten daemon.json but before meta: flush_handlers, so an
+# abort here would discard the pending Restart Docker and leave the worker with the new
+# config on disk and the old daemon still running.
+- name: Determine the installed docker-reaper version
+  ansible.builtin.command:
+    cmd: "{{ docker_reaper_install_path }}/docker-reaper --version"
+  register: docker_reaper_installed_version
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: docker_reaper_shims_command | default('', true) | length > 0
+
+# The gate stays CLOSED on anything unexpected: a non-zero rc, a task skipped under
+# --check, or a --version output that is not "docker-reaper <version>". The version test
+# RAISES rather than returning false on an unparseable string, so the match guard below
+# must run first -- Jinja's `and` short-circuits, which is what keeps it from ever seeing
+# one. A leading "v" is tolerated because the other version probe in this file adds one.
+- name: Determine whether the installed docker-reaper supports the shim sweep
+  ansible.builtin.set_fact:
+    docker_reaper_shims_supported: >-
+      {{ (docker_reaper_installed_version.rc | default(1)) == 0
+         and _docker_reaper_version is match('^[0-9]+(\.[0-9]+)*$')
+         and _docker_reaper_version is version(docker_reaper_shims_min_version, '>=') }}
+  vars:
+    _docker_reaper_version: >-
+      {{ ((docker_reaper_installed_version.stdout | default('')).split()
+          | last | default('', true)) | regex_replace('^v', '') }}
+  when: docker_reaper_shims_command | default('', true) | length > 0
+
+- name: Warn when the shim sweep is configured but unsupported
+  ansible.builtin.debug:
+    msg: >-
+      docker_reaper_shims_command is set, but the installed docker-reaper reports
+      "{{ docker_reaper_installed_version.stdout | default('') | trim | default('unknown', true) }}",
+      which predates {{ docker_reaper_shims_min_version }}. The shim sweep will be omitted.
+      Apply once with docker_reaper_upgrade=yes to pick up a newer binary.
+  when: docker_reaper_shims_command | default('', true) | length > 0 and not (docker_reaper_shims_supported | default(false) | bool)
+
 - name: Ensure docker_reaper.service systemd unit exists
   ansible.builtin.template:
     src: "docker_reaper.service.j2"

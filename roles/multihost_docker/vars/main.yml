@@ -28,6 +28,9 @@ parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
 oci_interceptor_install_path: "/usr/local/bin"
 oci_interceptor_github_url: "https://github.com/picoCTF/oci-interceptor"
 oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.gz"
+# dockerd invokes this instead of the binary directly, so the interceptor flags
+# can be applied without daemon.json runtimeArgs. See the template for why.
+oci_interceptor_wrapper_path: "{{ oci_interceptor_install_path }}/oci-interceptor-runtime"
 
 docker_reaper_install_path: "/usr/local/bin"
 docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"

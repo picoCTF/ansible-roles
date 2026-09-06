@@ -16,7 +16,12 @@ cmgr_logging: "warn"
 cmgr_registry_cert_dir: null
 cmgr_ports: null
 cmgr_concurrent_launches: null
-cmgr_prune_age: null
+# Must be <= the container sweep in multihost_docker (docker_reaper_command --min-age,
+# currently 30m). docker-reaper force-removes the container while this only expires cmgr's
+# database row, so a longer prune age leaves cmgrd reporting an instance whose container is
+# already gone -- the player gets connection-refused and nothing is logged. The two values
+# live in different roles and nothing checks them against each other.
+cmgr_prune_age: 30m
 cmgr_db_wal: null
 cmgr_enable_disk_quotas: null
 cmgr_extra_environment_vars: {}

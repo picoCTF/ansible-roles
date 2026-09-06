@@ -31,6 +31,10 @@ userns_remap_enabled: yes
 oci_interceptor_enabled: yes
 oci_interceptor_version: "latest"
 oci_interceptor_upgrade: no
+# The release that makes the interceptor exec rather than spawn the runtime. Below this,
+# the runtime wrapper still leaves one non-exec layer and shims keep leaking; the role
+# warns but does not fail, since an older binary works fine otherwise.
+oci_interceptor_min_version: "0.3.0"
 oci_interceptor_flags: ["--oi-readonly-networking-mounts"]
 
 logs_max_size: "10m"
@@ -70,8 +74,26 @@ docker_firewall_backend: nftables
 docker_reaper_enabled: yes
 docker_reaper_version: "latest"
 docker_reaper_upgrade: no
-docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks"
+docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks"
 docker_reaper_images_command: "images --threshold 80 --target 70"
+# Sweeps containerd shims left behind by containers that no longer exist, which
+# otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once
+# its container is absent from the daemon's full container list, so this can never
+# shorten a live container's life; min-age only spares shims caught mid-creation.
+# Set to an empty string to disable.
+#
+# Omitted, with a warning, on workers whose docker-reaper predates
+# docker_reaper_shims_min_version. Because docker_reaper_upgrade defaults to no and
+# "latest" only installs when the binary is ABSENT, an already-provisioned worker needs
+# one apply with docker_reaper_upgrade=yes before the sweep does anything at all.
+#
+# A sweep that finds candidates costs settle + (N x grace) -- with docker-reaper's 10s
+# defaults, clearing a large first backlog can hold the oneshot for minutes, during which
+# the container and image sweeps do not run. Harmless (Type=oneshot has no start timeout,
+# and the timer cannot re-trigger an active unit) but worth knowing on first rollout.
+docker_reaper_shims_command: "shims --min-age 5m"
+# First docker-reaper release providing the shims subcommand.
+docker_reaper_shims_min_version: "1.3.0"
 docker_reaper_interval_secs: 60
 
 cork_telemetry_enabled: yes
