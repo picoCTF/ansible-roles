@@ -1,14 +1,15 @@
 [Unit]
-Description=Compute docker cgroup CPU quota on startup
-Documentation=picoctf.ansible_roles.multihost_docker
-Wants=docker.service
+Description=Compute docker cgroup resource ceilings on startup
+Documentation=https://github.com/picoCTF/ansible-roles
+# Ordering only. The reverse dependency (docker.service pulling this unit in)
+# lives in a docker.service drop-in, so dockerd cannot start ahead of the
+# ceilings even when started manually or via socket activation.
 Before=docker.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-# Applies (80 x total host vCPUs) as the slice CPUQuota. Runs on every boot
-ExecStart=/bin/sh -c '/usr/bin/systemctl set-property --runtime {{ parent_cgroup }} CPUQuota=$(( 80 * $(nproc --all) ))%'
+ExecStart={{ container_slice_quota_script_path }}
 
 [Install]
 WantedBy=multi-user.target

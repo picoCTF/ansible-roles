@@ -21,7 +21,6 @@ systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"
 systemd_ufw_drop_in_dir: "/etc/systemd/system/ufw.service.d"
 
 storage_mount_point: "/mnt/docker-data"
-grub_cloudimg_config_path: "/etc/default/grub.d/50-cloudimg-settings.cfg"
 parent_cgroup: "limit_docker.slice"
 parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
 
@@ -52,3 +51,38 @@ docker_nftables_min_version: "29.6.0"
 nft_egress_table: "container_egress"
 nft_egress_conf_path: "/etc/nftables.d/container-egress.nft"
 nft_egress_service: "container-egress-filter.service"
+
+system_slice_drop_in_dir: "/etc/systemd/system/system.slice.d"
+container_slice_quota_script_path: "/usr/local/sbin/docker-cgroup-quota"
+
+# Container capacity implied by RAM, assuming a container_slice_min_mean_container_mb
+# mean. An estimate: it errs low (and so under-reserves) when the real mix skews
+# smaller than that mean.
+container_slice_ram_capacity: >-
+  {{ (((ansible_memtotal_mb | int) - (container_slice_os_reserve_mb | int)
+        - (container_slice_dockerd_reserve_mb | int) - (container_slice_user_reserve_mb | int))
+      // ((container_slice_min_mean_container_mb | int)
+          + (container_slice_host_mb_per_container | int))) | int }}
+
+# Effective container capacity: the operator's override when pinned, otherwise the
+# RAM-derived estimate. Feeds the host reserve and nothing else.
+container_slice_capacity: >-
+  {{ (container_slice_target_containers | int)
+     if (container_slice_target_containers is not none and (container_slice_target_containers | int) > 0)
+     else [ (container_slice_ram_capacity | int), 4 ] | max }}
+
+# Memory kept outside the container slice for the OS, interactive sessions and
+# the Docker control plane. The shim term scales with container count.
+container_slice_host_reserve_mb: >-
+  {{ (container_slice_os_reserve_mb | int) + (container_slice_dockerd_reserve_mb | int)
+     + (container_slice_user_reserve_mb | int)
+     + ((container_slice_host_mb_per_container | int) * (container_slice_capacity | int)) }}
+
+# Soft floors, derived rather than flat: system.slice is given the whole reserve
+# it was budgeted minus what user.slice needs, so MemoryLow tracks instance size
+# and container count instead of contradicting them.
+system_slice_memory_low_mb: >-
+  {{ (container_slice_host_reserve_mb | int) - (container_slice_user_reserve_mb | int) }}
+user_slice_memory_low_mb: "{{ container_slice_user_reserve_mb | int }}"
+
+user_slice_drop_in_dir: "/etc/systemd/system/user.slice.d"

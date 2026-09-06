@@ -1,10 +1,70 @@
+{#
+  Aggregate resource ceiling for every challenge container on this worker.
+
+  Memory is sized from what the HOST needs, not as a flat percentage of RAM.
+  The Docker control plane lives in system.slice, *outside* this slice, and its
+  footprint scales with the number of running containers: each one carries a
+  containerd-shim-runc-v2 of roughly {{ container_slice_host_mb_per_container }} MiB.
+  A percentage-of-RAM cap ignores that term entirely, so on a small instance it
+  grants this slice more memory than the box can spare. The global OOM killer
+  then fires before the slice ever reaches its own MemoryMax, and it picks a
+  victim by RSS -- which can be dockerd or containerd rather than a challenge.
+
+  Computed at deploy time from this host's facts. docker_cgroup_quota.service
+  recomputes the same formula at boot against the running kernel, so a resized
+  instance stays correct; that runtime drop-in takes precedence over the values
+  below.
+#}
+{% set capacity = container_slice_capacity | int %}
+{% set host_reserve_mb = container_slice_host_reserve_mb | int %}
+{% set slice_max_mb = (ansible_memtotal_mb | int) - host_reserve_mb %}
 [Unit]
 Description=Slice limiting combined total resources available to Docker containers
 Before=slices.target
 
 [Slice]
 CPUAccounting=true
-CPUQuota={{ 80 * ansible_processor_nproc }}%
+# {{ container_slice_cpu_percent_per_core }}% x {{ ansible_processor_vcpus }} vCPUs. Bounds aggregate container bandwidth;
+# it reserves nothing for the host, which is what CPUWeight below is for.
+# ansible_processor_vcpus, not ansible_processor_nproc: the latter is the
+# affinity mask of the Ansible process and would disagree with the `nproc --all`
+# the boot script uses.
+CPUQuota={{ (container_slice_cpu_percent_per_core | int) * (ansible_processor_vcpus | int) }}%
+# Containers lose every scheduler tie against system.slice and user.slice, which
+# stay at the default 100. Without this, sshd and dockerd compete with hundreds
+# of container threads at equal weight and interactive latency collapses long
+# before the CPU quota is ever reached.
+CPUWeight={{ container_slice_cpu_weight }}
+
 MemoryAccounting=true
-MemoryHigh=75%
-MemoryMax=80%
+# {{ ansible_memtotal_mb }} MiB total - {{ host_reserve_mb }} MiB host reserve
+# ({{ container_slice_os_reserve_mb }} OS + {{ container_slice_dockerd_reserve_mb }} dockerd/containerd + {{ container_slice_user_reserve_mb }} user sessions
+#  + {{ container_slice_host_mb_per_container }} x {{ capacity }} shims), leaving ~{{ (slice_max_mb / capacity) | round | int }} MiB per container
+# at the configured capacity.
+#
+# Deliberately no MemoryHigh. memory.high throttles *every* task in the cgroup,
+# not the one that overran, and with MemorySwapMax=0 and anon-heavy challenge
+# workloads reclaim has nothing to free, so the penalty saturates: all
+# containers on the worker stall in allocation instead of one being killed.
+# Hitting MemoryMax reclaims first and then OOM-kills inside the slice, which is
+# the intended behaviour -- lose one challenge, not the worker.
+MemoryMax={{ slice_max_mb }}M
+# Swapping challenge containers thrashes the whole box instead of killing one
+# container. Prefer the kill.
+MemorySwapMax={{ container_slice_swap_max }}
+
+# Host-survival backstop: {{ container_slice_tasks_max_pct }}% of this kernel's threads-max
+# ({{ kernel_threads_max | int }}). Sized against the kernel rather than against container
+# count x an average, because the invariant is "no combination of containers may
+# exhaust host thread capacity" -- a property of the kernel, not of the mix.
+# Per-container fork-bomb protection is the pidslimit container option's job.
+TasksAccounting=true
+TasksMax={{ ((kernel_threads_max | int) * (container_slice_tasks_max_pct | int) / 100) | round | int }}
+
+# Accounting only: it populates io.stat and the IO columns of systemd-cgtop,
+# which is how a disk-saturation stall gets diagnosed. No IOWeight -- cgroup v2
+# io.weight is honoured only by BFQ or a configured blk-iocost, and Ubuntu cloud
+# images default to none/mq-deadline, so setting it would look like protection
+# while doing nothing. Absolute throttling (IOReadBandwidthMax/
+# IOWriteBandwidthMax) works on any scheduler but needs per-device tuning.
+IOAccounting=true
