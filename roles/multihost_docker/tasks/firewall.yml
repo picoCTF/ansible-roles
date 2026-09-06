@@ -1,36 +1,135 @@
 ---
 
-# Configures ufw rules to block access to certain CIDRs from inside Docker containers.
-
-- name: Ensure ufw.service drop-in directory exists
-  ansible.builtin.file:
-    path: "{{ systemd_ufw_drop_in_dir }}"
-    state: directory
-
-# Modifies ufw.service to start after docker.service, so that the DOCKER-USER iptables chain exists to modify.
-- name: Ensure ufw.service drop-in unit exists
-  ansible.builtin.copy:
-    src: "ufw.service_override.conf"
-    dest: "{{ systemd_ufw_drop_in_dir }}/override.conf"
-    force: yes
-  notify:
-    - Reload systemd config
+# Blocks access to certain CIDRs from inside Docker containers.
+#
+# How that is done depends on which firewall backend dockerd is running. On the
+# iptables backend the rules go into the DOCKER-USER chain, which Docker creates
+# and consults before its own accept rules, via ufw's after.rules. On the
+# nftables backend that chain does not exist -- docker 29 creates
+# `table ip docker-bridges` and `table ip6 docker-bridges` and nothing matching
+# "user" -- so the same rules live in a table of this role's own, hooked into
+# `forward` well before anything Docker registers.
+#
+# Both branches remove the other's artifacts, so a host may be moved between
+# backends without leaving a dead ruleset that reads as though it were filtering.
 
 - name: Ensure ufw is enabled (with default-allow policy)
   community.general.ufw:
     state: enabled
     policy: allow
 
-- name: Drop traffic from containers to all specified IPv4 CIDRs
-  ansible.builtin.blockinfile:
-    path: /etc/ufw/after.rules
-    block: "-I DOCKER-USER -d {{ item }} -j REJECT -m comment --comment \"Ansible managed\""
-    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
-    insertbefore: "COMMIT"
-  with_items: "{{ container_deny_ipv4_cidrs }}"
-  notify:
-    - Reload ufw
+# ------------------------------------------------------------ iptables backend
 
-# IPv6 is not enabled by default in Docker, so no ip6tables DOCKER-USER chain typically(?) exists.
-# If this changes in the future, we can add a container_rejected_ipv6_cidrs variable, including the
-# EC2 metadata endpoint CIDR (fd00:ec2::254/128) by default
+- name: Configure container egress denials on the iptables backend
+  when: docker_firewall_backend == "iptables"
+  block:
+    - name: Ensure ufw.service drop-in directory exists
+      ansible.builtin.file:
+        path: "{{ systemd_ufw_drop_in_dir }}"
+        state: directory
+
+    # Modifies ufw.service to start after docker.service, so that the DOCKER-USER iptables chain exists to modify.
+    - name: Ensure ufw.service drop-in unit exists
+      ansible.builtin.copy:
+        src: "ufw.service_override.conf"
+        dest: "{{ systemd_ufw_drop_in_dir }}/override.conf"
+        force: yes
+      notify:
+        - Reload systemd config
+
+    - name: Drop traffic from containers to all specified IPv4 CIDRs
+      ansible.builtin.blockinfile:
+        path: /etc/ufw/after.rules
+        block: "-I DOCKER-USER -d {{ item }} -j REJECT -m comment --comment \"Ansible managed\""
+        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
+        insertbefore: "COMMIT"
+      with_items: "{{ container_deny_ipv4_cidrs }}"
+      notify:
+        - Reload ufw
+
+    # IPv6 is not enabled by default in Docker, so no ip6tables DOCKER-USER chain typically(?) exists.
+    # container_deny_ipv6_cidrs is therefore only honoured on the nftables backend, whose table covers
+    # both families at once.
+    - name: Fail if IPv6 denials were requested on the iptables backend
+      ansible.builtin.assert:
+        that: container_deny_ipv6_cidrs | length == 0
+        fail_msg: >-
+          container_deny_ipv6_cidrs is set but docker_firewall_backend is 'iptables', which has no
+          ip6tables DOCKER-USER chain to insert into. Either clear the list or move this host to the
+          nftables backend, whose inet table covers both families.
+
+    - name: Ensure the nftables container egress filter is not left loaded
+      ansible.builtin.systemd:
+        name: "{{ nft_egress_service }}"
+        state: stopped
+        enabled: no
+      failed_when: false
+
+    - name: Ensure the nftables container egress unit and ruleset are absent
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ systemd_unit_dir }}/{{ nft_egress_service }}"
+        - "{{ nft_egress_conf_path }}"
+      notify:
+        - Reload systemd config
+
+# ------------------------------------------------------------ nftables backend
+
+- name: Configure container egress denials on the nftables backend
+  when: docker_firewall_backend == "nftables"
+  block:
+    - name: Ensure the nftables include directory exists
+      ansible.builtin.file:
+        path: "{{ nft_egress_conf_path | dirname }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure the container egress ruleset is present
+      ansible.builtin.template:
+        src: container_egress.nft.j2
+        dest: "{{ nft_egress_conf_path }}"
+        mode: '0644'
+        # nft parses the whole file as one transaction, so a template that does
+        # not load leaves the previous ruleset in place rather than a partial one.
+        validate: /usr/sbin/nft -c -f %s
+      notify:
+        - Reload container egress filter
+
+    - name: Ensure the container egress unit is present
+      ansible.builtin.template:
+        src: container_egress.service.j2
+        dest: "{{ systemd_unit_dir }}/{{ nft_egress_service }}"
+        mode: '0644'
+      notify:
+        - Reload systemd config
+
+    - name: Ensure the container egress filter is enabled and loaded
+      ansible.builtin.systemd:
+        name: "{{ nft_egress_service }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    # The ufw rules for the iptables backend are removed rather than left in
+    # place: on this backend DOCKER-USER does not exist, so `iptables-restore`
+    # fails on the whole after.rules file and every later `ufw reload` is a
+    # no-op -- which would silently drop whatever port policy ufw is also
+    # carrying, not just these lines.
+    - name: Remove the DOCKER-USER container egress rules from ufw
+      ansible.builtin.blockinfile:
+        path: /etc/ufw/after.rules
+        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
+        state: absent
+      with_items: "{{ container_deny_ipv4_cidrs }}"
+      notify:
+        - Reload ufw
+
+    # ufw no longer has to wait for Docker to create a chain for it.
+    - name: Remove the ufw-after-docker drop-in
+      ansible.builtin.file:
+        path: "{{ systemd_ufw_drop_in_dir }}/override.conf"
+        state: absent
+      notify:
+        - Reload systemd config

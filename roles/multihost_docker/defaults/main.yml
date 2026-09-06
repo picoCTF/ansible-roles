@@ -37,6 +37,35 @@ logs_max_size: "10m"
 logs_max_files: 3
 
 container_deny_ipv4_cidrs: ["169.254.169.254/32"]
+# IPv6 counterpart, honoured only on the nftables backend (the iptables backend
+# has no ip6tables DOCKER-USER chain to insert into, and the role refuses a
+# non-empty list there rather than accepting rules it will not apply). The EC2
+# metadata endpoint's IPv6 address is fd00:ec2::254/128 if IPv6 is ever enabled
+# on these hosts.
+container_deny_ipv6_cidrs: []
+
+# Which firewall dockerd programs: "nftables" or "iptables".
+#
+# nftables measured ~7x the launch throughput of iptables on this fleet's
+# workload -- the iptables lock serialises dockerd's per-container rule
+# batches -- so it is the default. Set "iptables" to fall back; what differs
+# between them, and what the role does about it:
+#   * nftables needs Docker >= docker_nftables_min_version (see vars/main.yml),
+#     which is what docker_version_pin_map pins. The backend arrived in 29.0.0,
+#     but 29.0-29.5 link libnftables and abort once a netlink socket lands on
+#     fd >= 1024 (moby#52873, which containers on user-defined networks reach);
+#     29.6.0 execs the nft binary instead (moby#52886). 28.x reads the setting
+#     and silently keeps programming iptables, so the role asserts the version
+#     actually installed rather than trusting this.
+#   * Docker does not enable net.ipv4.ip_forward on nftables, so the role sets
+#     it. On the iptables backend Docker sets it itself.
+#   * there is no DOCKER-USER chain on nftables, so container_deny_* moves out
+#     of ufw's after.rules and into this role's own nft table. See
+#     tasks/firewall.yml, which moves them in both directions.
+#   * Docker does not tidy up the backend it was using before, so a host
+#     switched in place keeps its old chains, still matching. Flip this on a
+#     fresh instance, or roll the fleet.
+docker_firewall_backend: nftables
 
 docker_reaper_enabled: yes
 docker_reaper_version: "latest"

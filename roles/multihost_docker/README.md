@@ -86,8 +86,50 @@ TLS unconditionally, so there is no option to disable it.
 | Name | Description | Default |
 | --- | --- | --- |
 | `container_deny_ipv4_cidrs` | Traffic to these IPv4 CIDRs from inside any container is rejected. | `["169.254.169.254/32"]` |
+| `container_deny_ipv6_cidrs` | The same for IPv6. Only honoured on the nftables backend; the role fails if it is non-empty on the iptables one, which has no `ip6tables` `DOCKER-USER` chain. | `[]` |
+| `docker_firewall_backend` | Which firewall dockerd programs: `nftables` or `iptables`. | `nftables` |
 
 ufw is enabled with a **default-allow** policy; the role adds no port restrictions of its own.
+
+#### Choosing a firewall backend
+
+`nftables` measured roughly **7x the launch throughput** of `iptables` on this fleet's workload —
+dockerd's per-container rule batches serialise on the iptables lock — so it is the default. It is
+not a drop-in swap, though. Set `docker_firewall_backend: iptables` to fall back, and note:
+
+* **It needs Docker >= 29.6.0** (`docker_nftables_min_version`), which is what
+  `docker_version_pin_map` pins. The backend arrived in 29.0.0, but
+  29.0–29.5 link `libnftables` and abort the daemon once a netlink socket gets a file descriptor
+  over 1024 ([moby#52873](https://github.com/moby/moby/issues/52873)), which containers on
+  user-defined networks reach in normal use; 29.6.0 execs the `nft` binary instead
+  ([moby#52886](https://github.com/moby/moby/pull/52886)). **28.x accepts the setting and silently
+  goes on programming iptables**, so the role asserts the installed version rather than trusting the
+  configuration. `docker_version_pin_map` pins 29.6.0.
+* **Docker does not enable `net.ipv4.ip_forward` in this mode.** The role sets it; on the iptables
+  backend Docker sets it itself.
+* **There is no `DOCKER-USER` chain.** Docker 29 in nftables mode creates `table ip docker-bridges`
+  and `table ip6 docker-bridges` and nothing else, so `container_deny_*` cannot be inserted the way
+  it is on the iptables backend. On this backend the role owns
+  `/etc/nftables.d/container-egress.nft` — a `table inet container_egress` hooked into `forward` at
+  priority -300, well before anything Docker registers — loaded by
+  `container-egress-filter.service`. It needs no ordering against `docker.service` and survives
+  Docker restarts and network creation untouched.
+
+  Switching backends moves those rules for you, in both directions: the nftables branch also strips
+  the `DOCKER-USER` lines out of `/etc/ufw/after.rules`, because on this backend
+  `iptables-restore` cannot find that chain and **every subsequent `ufw reload` fails**, taking
+  whatever else ufw is carrying with it.
+* **Flip it on a fresh instance, not a live one.** Docker programs the backend it is configured for
+  and does not tidy up after the one it was using before, so a host converted in place keeps its old
+  `DOCKER`/`DOCKER-ISOLATION` iptables chains, still matching, while the new nftables rules are
+  added alongside. The role does not flush them: guessing which iptables rules belong to Docker on a
+  host that also runs ufw is not something to automate. Reboot the instance after the switch, or
+  roll the fleet — on an autoscaled fleet, replacement is the normal path anyway.
+
+Verify a worker took the backend with `docker info | grep -i firewall` (expect
+`Firewall Backend: nftables`), that its egress denials are loaded with
+`nft list table inet container_egress`, and that `iptables -S DOCKER-USER` reports no such chain.
+
 The dockerd (2376) and telemetry (2136) ports are exposed on all interfaces — restrict reachability
 with security groups. dockerd requires mTLS, but the telemetry endpoint is unauthenticated
 plain HTTP.

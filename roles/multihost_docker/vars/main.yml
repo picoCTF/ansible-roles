@@ -33,6 +33,19 @@ docker_reaper_install_path: "/usr/local/bin"
 docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"
 docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"
 
+# Confirm against `apt-cache madison docker-ce` before changing: the epoch and
+# the distribution suffix are part of the version string apt matches on.
 docker_version_pin_map:
-  jammy: "5:28.5.2-1~ubuntu.22.04~jammy"
-  noble: "5:28.5.2-1~ubuntu.24.04~noble"
+  jammy: "5:29.6.0-1~ubuntu.22.04~jammy"
+  noble: "5:29.6.0-1~ubuntu.24.04~noble"
+
+# The first Docker release whose nftables backend is usable: 29.0.0 introduced
+# it, but only 29.6.0 stopped linking libnftables, which aborts the daemon once
+# a netlink socket gets a file descriptor >= 1024 (moby#52873).
+docker_nftables_min_version: "29.6.0"
+
+# The nftables table and loader unit that carry container_deny_* on the nftables
+# backend, where there is no DOCKER-USER chain to insert into.
+nft_egress_table: "container_egress"
+nft_egress_conf_path: "/etc/nftables.d/container-egress.nft"
+nft_egress_service: "container-egress-filter.service"

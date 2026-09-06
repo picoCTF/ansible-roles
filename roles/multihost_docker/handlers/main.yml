@@ -30,6 +30,12 @@
     state: reloaded
   become: yes
 
+- name: Reload container egress filter
+  ansible.builtin.systemd:
+    name: "{{ nft_egress_service }}"
+    state: reloaded
+  become: yes
+
 - name: Restart docker-reaper service unit
   ansible.builtin.service:
     name: docker_reaper.service

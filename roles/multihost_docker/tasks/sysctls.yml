@@ -30,3 +30,15 @@
     value: "8192"
     state: present
     sysctl_set: yes
+
+# Docker enables IPv4 forwarding itself on the iptables backend, but not on the
+# nftables one, where a host that has never had it set routes nothing off the
+# bridge: containers reach each other and nothing else. Set explicitly rather
+# than relying on the daemon.
+- name: Enable IPv4 forwarding for the nftables firewall backend
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    sysctl_set: yes
+  when: docker_firewall_backend == "nftables"

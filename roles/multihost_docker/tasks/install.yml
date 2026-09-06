@@ -36,6 +36,17 @@
     filename: docker
     state: present
 
+# The nftables backend execs /usr/sbin/nft rather than linking libnftables, so
+# the binary has to be on the host. docker-ce depends on the package on Ubuntu,
+# but state it here: this role is what decides to use the backend, and a missing
+# nft would otherwise surface as dockerd failing to program any rule at all.
+- name: Ensure the nftables package is installed
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+    update_cache: yes
+  when: docker_firewall_backend == "nftables"
+
 - name: Gather installed package facts
   ansible.builtin.package_facts:
     manager: apt
@@ -63,6 +74,30 @@
   notify:
     - Restart Docker
   when: (docker_pin_version | bool)
+
+# Checked against what is installed rather than against the pin: an unpinned
+# host takes whatever the repository offers, and 28.x accepts
+# "firewall-backend": "nftables" in daemon.json and goes on programming
+# iptables, so the failure this guards against is silent.
+- name: Fail if the nftables backend was requested on a Docker too old to implement it
+  vars:
+    # package_facts reports the full apt version, epoch and revision included
+    # (5:29.6.0-1~ubuntu.24.04~noble). Only the upstream part is comparable.
+    docker_upstream_version: >-
+      {{ ansible_facts.packages['docker-ce'][0].version
+         | default('0') | regex_replace('^[0-9]+:', '') | regex_replace('-.*$', '') }}
+  ansible.builtin.assert:
+    that:
+      - "'docker-ce' in ansible_facts.packages"
+      - docker_upstream_version is version(docker_nftables_min_version, '>=')
+    fail_msg: >-
+      docker_firewall_backend is 'nftables' but the installed docker-ce is
+      {{ ansible_facts.packages['docker-ce'][0].version | default('absent') }}
+      (upstream {{ docker_upstream_version }}), below {{ docker_nftables_min_version }}.
+      Releases before that either have no nftables bridge firewaller at all (28.x, which
+      silently keeps programming iptables) or abort on a netlink socket with a file
+      descriptor over 1024 (29.0-29.5, moby#52873).
+  when: docker_firewall_backend == "nftables"
 
 - name: Hold Docker packages at current version
   ansible.builtin.dpkg_selections:
