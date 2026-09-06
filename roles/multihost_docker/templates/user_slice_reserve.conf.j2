@@ -1,0 +1,10 @@
+{#
+  Interactive login sessions live in user.slice, not system.slice, so the
+  system.slice reserve does not cover them. Without this an admin's ssh session
+  is unbudgeted and among the first things reclaimed on a loaded worker -- the
+  exact moment it is needed. CPUWeight on the container slice covers the CPU
+  half of keeping a worker reachable; this is the memory half.
+#}
+[Slice]
+MemoryMin={{ user_slice_memory_min_mb }}M
+MemoryLow={{ user_slice_memory_low_mb | int }}M

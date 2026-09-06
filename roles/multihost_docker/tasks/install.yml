@@ -75,6 +75,32 @@
     - Restart Docker
   when: (docker_pin_version | bool)
 
+- name: Hold Docker packages at current version
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - docker-ce
+    - docker-ce-cli
+  when: (docker_pin_version | bool)
+
+- name: Ensure Docker Engine is installed (unpinned)
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+    state: "{{ 'latest' if (upgrade | bool) else 'present' }}"
+  notify:
+    - Restart Docker
+  when: not (docker_pin_version | bool)
+
+# Re-read package facts: the gather earlier in this file ran before the installs
+# below, so on a fresh host it reports docker-ce absent and on an upgrade it
+# reports the version being replaced. The guard has to see what is on disk now.
+- name: Re-gather installed package facts after installation
+  ansible.builtin.package_facts:
+    manager: apt
+
 # Checked against what is installed rather than against the pin: an unpinned
 # host takes whatever the repository offers, and 28.x accepts
 # "firewall-backend": "nftables" in daemon.json and goes on programming
@@ -98,25 +124,6 @@
       silently keeps programming iptables) or abort on a netlink socket with a file
       descriptor over 1024 (29.0-29.5, moby#52873).
   when: docker_firewall_backend == "nftables"
-
-- name: Hold Docker packages at current version
-  ansible.builtin.dpkg_selections:
-    name: "{{ item }}"
-    selection: hold
-  loop:
-    - docker-ce
-    - docker-ce-cli
-  when: (docker_pin_version | bool)
-
-- name: Ensure Docker Engine is installed (unpinned)
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-    state: "{{ 'latest' if (upgrade | bool) else 'present' }}"
-  notify:
-    - Restart Docker
-  when: not (docker_pin_version | bool)
 
 # Other unpinned
 - name: Ensure Docker plugins and containerd are installed

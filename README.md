@@ -10,6 +10,11 @@ However, some roles include variables which can cause non-idempotent behavior (u
 regenerating certificates, etc.) if set to non-default values. Check each role's README file for a
 full description of configurable variables.
 
+These roles are not versioned. [MIGRATION.md](MIGRATION.md) records the changes that need
+an operator to do something -- drain a host, upgrade a package, set a variable -- rather
+than just re-run the role. Check it before applying a role to a host that is already
+running.
+
 Note that as of this writing, all roles have only been tested on x86_64 Ubuntu LTS hosts,
 though they may be portable to other platforms with minor changes.
 

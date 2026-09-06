@@ -1,0 +1,78 @@
+#!/bin/sh
+# Recomputes the {{ parent_cgroup }} ceilings against the running kernel, so a
+# resized instance stays correctly bounded without re-running Ansible.
+#
+# Applies the same formula as limit_docker.slice.j2, but derives capacity from
+# the running host's RAM rather than from facts gathered at deploy time. Values
+# are set with `systemctl set-property --runtime`, which writes to
+# /run/systemd/system.control/{{ parent_cgroup }}.d/ and takes precedence over
+# the on-disk unit.
+#
+# Deliberately never exits without applying something. Runtime drop-ins do not
+# survive a reboot, so bailing out would leave the previous deploy's on-disk
+# ceilings in force -- and after a downsize those are sized for the *old*,
+# larger instance, which is exactly the overcommit this unit exists to prevent.
+set -eu
+
+TOTAL_MB=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
+CPUS=$(nproc --all)
+
+OS_MB={{ container_slice_os_reserve_mb | int }}
+DOCKERD_MB={{ container_slice_dockerd_reserve_mb | int }}
+USER_MB={{ container_slice_user_reserve_mb | int }}
+HOST_MB={{ container_slice_host_mb_per_container | int }}
+PER_CTR_MB={{ container_slice_min_mean_container_mb | int }}
+MIN_MB={{ container_slice_min_mb | int }}
+# 0 when container_slice_target_containers is left null, meaning "derive".
+PINNED_TARGET={{ container_slice_target_containers | int }}
+
+if [ "$PINNED_TARGET" -gt 0 ]; then
+    TARGET="$PINNED_TARGET"
+else
+    TARGET=$(( (TOTAL_MB - OS_MB - DOCKERD_MB - USER_MB) / (PER_CTR_MB + HOST_MB) ))
+    [ "$TARGET" -lt 4 ] && TARGET=4
+fi
+
+RESERVE_MB=$(( OS_MB + DOCKERD_MB + USER_MB + HOST_MB * TARGET ))
+SLICE_MAX_MB=$(( TOTAL_MB - RESERVE_MB ))
+
+# Clamp rather than refuse. A too-small slice still bounds containers; leaving
+# the stale on-disk ceiling in place does not.
+if [ "$SLICE_MAX_MB" -lt "$MIN_MB" ]; then
+    echo "warning: ${TOTAL_MB}MiB total less a ${RESERVE_MB}MiB host reserve leaves" \
+         "${SLICE_MAX_MB}MiB for containers, below the ${MIN_MB}MiB floor." \
+         "Clamping to ${MIN_MB}MiB -- this instance is too small for a capacity of" \
+         "${TARGET} containers and the host reserve cannot be honoured." >&2
+    SLICE_MAX_MB="$MIN_MB"
+fi
+
+# A pinned capacity can claim more containers than the slice can actually feed.
+if [ "$SLICE_MAX_MB" -lt $(( TARGET * PER_CTR_MB )) ]; then
+    echo "warning: capacity ${TARGET} x ${PER_CTR_MB}MiB exceeds the ${SLICE_MAX_MB}MiB" \
+         "available to the slice; containers will be OOM-killed before it fills" >&2
+fi
+
+CPU_QUOTA=$(( {{ container_slice_cpu_percent_per_core | int }} * CPUS ))
+
+# Aggregate task ceiling is a fraction of the kernel's own thread limit, not a
+# multiple of container count: the invariant is that no mix of containers may
+# exhaust host thread capacity, which is a property of the kernel rather than of
+# the container mix. kernel.threads-max is RAM-derived, so this tracks a resize
+# automatically. kernel.pid_max is typically far higher and never binds first.
+THREADS_MAX=$(cat /proc/sys/kernel/threads-max)
+TASKS_MAX=$(( THREADS_MAX * {{ container_slice_tasks_max_pct | int }} / 100 ))
+
+# Host-side floors, recomputed here for the same reason: they are derived from
+# the reserve, which moves with instance size.
+SYSTEM_LOW_MB=$(( RESERVE_MB - USER_MB ))
+
+echo "applying to {{ parent_cgroup }}: CPUQuota=${CPU_QUOTA}% MemoryMax=${SLICE_MAX_MB}M" \
+     "TasksMax=${TASKS_MAX}; system.slice MemoryLow=${SYSTEM_LOW_MB}M" \
+     "(${TOTAL_MB}MiB total, ${RESERVE_MB}MiB host reserve, capacity ${TARGET}, ${CPUS} vCPUs)"
+
+/usr/bin/systemctl set-property --runtime system.slice "MemoryLow=${SYSTEM_LOW_MB}M"
+
+exec /usr/bin/systemctl set-property --runtime {{ parent_cgroup }} \
+    "CPUQuota=${CPU_QUOTA}%" \
+    "MemoryMax=${SLICE_MAX_MB}M" \
+    "TasksMax=${TASKS_MAX}"

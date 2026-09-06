@@ -11,6 +11,7 @@
     "data-root": "{{ storage_mount_point }}",
     {% endif %}
     "storage-driver": "overlay2",
+    "firewall-backend": "{{ docker_firewall_backend }}",
 
     "cgroup-parent": "{{ parent_cgroup }}",
     "exec-opts": ["native.cgroupdriver=systemd"],

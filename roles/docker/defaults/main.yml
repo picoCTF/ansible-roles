@@ -28,9 +28,114 @@ logs_max_size: "10m"
 logs_max_files: 3
 
 container_deny_ipv4_cidrs: ["169.254.169.254/32"]
+container_deny_ipv6_cidrs: []
+
+docker_firewall_backend: iptables
 
 docker_reaper_enabled: yes
 docker_reaper_version: "latest"
 docker_reaper_upgrade: no
 docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 60m --reap-networks"
 docker_reaper_interval_secs: 60
+
+# Aggregate container resource ceilings (limit_docker.slice).
+#
+# Memory is sized as "total RAM minus what the host needs", not as a percentage
+# of RAM. The Docker control plane (dockerd, containerd, and one
+# containerd-shim-runc-v2 per running container) lives in system.slice, outside
+# the container slice, so the host's footprint grows with container count. A
+# flat percentage ignores that and lets the slice be granted more memory than
+# the machine can spare, at which point the global OOM killer -- which selects
+# by RSS and may pick dockerd -- fires before the slice's own limit is reached.
+
+# The lowest MEAN container footprint this worker's shim reserve survives.
+#
+# Not an average, and not a per-container limit -- it never becomes a cgroup
+# setting. Its only job is to decide how many containerd-shims to reserve host
+# memory for, and the arithmetic works out so that the reserve is sufficient
+# exactly when the fleet's actual mean container size is at or above this value.
+# Below it the reserve is short, and badly: on a 4 GiB worker a 10 MiB mean
+# overruns the shim budget by ~1245 MiB.
+#
+# Container *asymmetry* does not matter here -- a socat one-liner beside a
+# multi-service stack is fine as long as the mean holds. What matters is a lower
+# bound on that mean. Set it below the smallest mean you expect, not at the mean
+# you observe: undershooting costs a few percent of container memory, while
+# overshooting costs the worker. A live picoCTF worker measured ~48 MiB mean, so
+# 30 leaves roughly 40% headroom for a shift toward smaller challenges.
+container_slice_min_mean_container_mb: 30
+# Container capacity this worker is sized for. Drives the memory reserve. Leave
+# null to derive it from RAM. A pinned value is NOT recomputed on a resize.
+container_slice_target_containers: null
+# Base OS footprint outside Docker (systemd, journald, sshd, and whatever agents
+# the fleet runs -- cloudwatch, ssm, snapd, atop).
+container_slice_os_reserve_mb: 256
+# dockerd + containerd themselves, excluding per-container shims.
+#
+# Measured on a production worker up 10 weeks (kernel 6.17, 5 containers running):
+# docker.service anon 169 MiB + kernel 31, containerd.service anon 57 + kernel 7 --
+# 264 MiB together, with anon alone already over the 192 MiB this used to reserve.
+#
+# Read `anon`, `file` and `kernel` from memory.stat, NOT the slab_* fields: on 6.17
+# those double-count shared dentry/inode objects and exceed the cgroup's own kernel
+# total, while anon + file + kernel sums to memory.current exactly.
+#
+# Sized for a long-lived worker rather than a fresh one. The same daemon measured
+# ~133 MiB shortly after boot, so dockerd grows substantially with uptime and a
+# reserve taken from a freshly booted host understates it badly.
+container_slice_dockerd_reserve_mb: 320
+# Interactive login sessions. These live in user.slice, not system.slice, so
+# they need their own budget or an admin's ssh is the first thing reclaimed on a
+# loaded worker -- the exact moment it is needed.
+container_slice_user_reserve_mb: 128
+# Host-side memory each running container costs OUTSIDE limit_docker.slice.
+#
+# Measured on Docker 29.8 / containerd 2.3 by launching 20 containers and reading
+# the cgroup deltas: containerd.service grew 4.36 MiB per container (the
+# containerd-shim-runc-v2) and docker.service grew 0.77 MiB per container, for
+# 5.13 MiB total. 6 covers that plus headroom for dockerd's larger per-container
+# state when each instance also gets its own network.
+#
+# Use cgroup accounting, not RSS, when re-measuring: the same 20 shims showed a
+# mean VmRSS of 10.75 MiB because RSS counts their shared binary and libraries
+# once per process, while the cgroup charges shared pages once.
+container_slice_host_mb_per_container: 6
+# Refuse to apply a configuration leaving the slice less than this.
+container_slice_min_mb: 256
+
+# Per-core CPU percentage granted to the slice in aggregate.
+container_slice_cpu_percent_per_core: 80
+# Scheduler weight relative to system.slice and user.slice, which stay at the
+# default 100. Lower means containers yield to sshd and dockerd under
+# contention. CPUQuota alone does not do this: it caps aggregate bandwidth but
+# grants the host no priority, so interactive latency collapses well before the
+# quota binds.
+container_slice_cpu_weight: 20
+# Swap available to the slice. 0 prefers killing one container over thrashing
+# the whole host.
+container_slice_swap_max: 0
+# Aggregate TasksMax, as a percentage of kernel.threads-max.
+#
+# Deliberately NOT derived from container count x a per-container average: this
+# is a host-survival backstop, and the invariant it enforces ("no combination of
+# containers may exhaust host thread capacity") is a property of the kernel, not
+# of the container mix. Averaging breaks in both directions on a heterogeneous
+# fleet -- a stack-heavy mix trips a count-derived ceiling and legitimate
+# challenges fail to fork, while a socat-heavy mix leaves it uselessly loose.
+# Per-container fork-bomb protection is the pidslimit container option's job.
+#
+# kernel.threads-max is RAM-derived (roughly 6 x MemTotal in MiB) and is the real
+# ceiling on a small instance; kernel.pid_max is typically far higher and never
+# binds first.
+container_slice_tasks_max_pct: 50
+
+# Host memory protected from reclaim driven by container allocation.
+#
+# memory.min is a hard guarantee: pages the cgroup is actually using are never
+# reclaimed. It does NOT reserve unused headroom -- anything the cgroup is not
+# using stays fully available to every other cgroup -- so sizing it to the real
+# working set costs nothing and is what actually survives sustained pressure.
+# memory.low is best-effort and is given up when there is no other choice, so it
+# belongs above the hard floor, not below it.
+system_slice_memory_min_mb: 256
+user_slice_memory_min_mb: 64
