@@ -13,6 +13,25 @@
 # Both branches remove the other's artifacts, so a host may be moved between
 # backends without leaving a dead ruleset that reads as though it were filtering.
 
+# BEFORE ufw is touched, and this ordering is load-bearing.
+#
+# `ufw enable` runs iptables-restore over after.rules. On the nftables backend
+# DOCKER-USER does not exist, so a host still carrying those lines -- every host
+# being migrated from the iptables backend -- fails that task, and the play dies
+# here, before reaching any task that could clean them up. It then fails the same
+# way on every re-run: the migration is impossible without hand-editing the file.
+#
+# Removes EVERY ansible-managed DOCKER-USER block, not the ones whose CIDR is
+# still in container_deny_ipv4_cidrs: a CIDR dropped from the list leaves a block
+# no loop can name any more, and one leftover line is enough to make
+# iptables-restore reject the whole file.
+- name: Remove every ansible-managed DOCKER-USER container egress block from ufw
+  ansible.builtin.replace:
+    path: /etc/ufw/after.rules
+    regexp: '(?m)^# BEGIN ANSIBLE MANAGED BLOCK [^\n]*\n-I DOCKER-USER [^\n]*\n# END ANSIBLE MANAGED BLOCK [^\n]*\n'
+    replace: ''
+  when: docker_firewall_backend == "nftables"
+
 - name: Ensure ufw is enabled (with default-allow policy)
   community.general.ufw:
     state: enabled
@@ -48,13 +67,29 @@
       notify:
         - Reload systemd config
 
+    # One block holding every CIDR, rather than a block per CIDR. With a marker
+    # per CIDR, dropping one from container_deny_ipv4_cidrs left its block in
+    # place for ever: no later loop names it, so nothing removes it and the host
+    # goes on rejecting traffic the operator meant to allow. A single block is
+    # rewritten whole on every change.
+    - name: Ensure any per-CIDR container egress blocks from earlier runs are gone
+      ansible.builtin.replace:
+        path: /etc/ufw/after.rules
+        regexp: '(?m)^# BEGIN ANSIBLE MANAGED BLOCK (?!container egress)[^\n]*\n-I DOCKER-USER [^\n]*\n# END ANSIBLE MANAGED BLOCK [^\n]*\n'
+        replace: ''
+      notify:
+        - Reload ufw
+
     - name: Drop traffic from containers to all specified IPv4 CIDRs
       ansible.builtin.blockinfile:
         path: /etc/ufw/after.rules
-        block: "-I DOCKER-USER -d {{ item }} -j REJECT -m comment --comment \"Ansible managed\""
-        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK container egress"
+        block: |-
+          {% for cidr in container_deny_ipv4_cidrs %}
+          -I DOCKER-USER -d {{ cidr }} -j REJECT -m comment --comment "Ansible managed"
+          {% endfor %}
         insertbefore: "COMMIT"
-      with_items: "{{ container_deny_ipv4_cidrs }}"
+        state: "{{ 'present' if container_deny_ipv4_cidrs | length > 0 else 'absent' }}"
       notify:
         - Reload ufw
 
@@ -128,8 +163,7 @@
         # nft parses the whole file as one transaction, so a template that does
         # not load leaves the previous ruleset in place rather than a partial one.
         validate: /usr/sbin/nft -c -f %s
-      notify:
-        - Reload container egress filter
+      register: nft_egress_ruleset
 
     - name: Ensure the container egress unit is present
       ansible.builtin.template:
@@ -145,21 +179,28 @@
         enabled: yes
         state: started
         daemon_reload: yes
+      register: nft_egress_unit
+
+    # Deliberately not a handler. A handler runs at flush_handlers, so a play
+    # that fails anywhere between the template above and the end of the run
+    # leaves the kernel holding the previous ruleset while the file on disk says
+    # otherwise -- and the NEXT run finds the file unchanged, never notifies, and
+    # the divergence is permanent. Applying it here costs one systemctl call and
+    # makes the file and the kernel agree before anything else can fail.
+    #
+    # `state: started` above does not do it: on a host where the unit is already
+    # running that is a no-op, and the unit is what loads the ruleset.
+    - name: Load the container egress ruleset now if it changed
+      ansible.builtin.systemd:
+        name: "{{ nft_egress_service }}"
+        state: reloaded
+      when: nft_egress_ruleset is changed and not (nft_egress_unit is changed)
 
     # The ufw rules for the iptables backend are removed rather than left in
     # place: on this backend DOCKER-USER does not exist, so `iptables-restore`
     # fails on the whole after.rules file and every later `ufw reload` is a
     # no-op -- which would silently drop whatever port policy ufw is also
     # carrying, not just these lines.
-    - name: Remove the DOCKER-USER container egress rules from ufw
-      ansible.builtin.blockinfile:
-        path: /etc/ufw/after.rules
-        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item }}"
-        state: absent
-      with_items: "{{ container_deny_ipv4_cidrs }}"
-      notify:
-        - Reload ufw
-
     # ufw no longer has to wait for Docker to create a chain for it.
     - name: Remove the ufw-after-docker drop-in
       ansible.builtin.file:
