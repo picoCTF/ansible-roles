@@ -43,6 +43,74 @@ If a worker is sized for far fewer containers than its RAM implies, pin
 `container_slice_target_containers` rather than letting it derive from RAM; that shrinks
 the reserve and hands the memory back to containers.
 
+## Sizing a worker to its challenge mix
+
+**Affects** `multihost_docker`, `docker` · **Action required: none, but read before choosing an
+instance type**
+
+### Memory is the constraint. CPU is not.
+
+Measured on a loaded 2 GiB / 2 vCPU worker: five containers consumed **3395 CPU-seconds over a
+week of uptime** — 0.28% of the box — and the slice was throttled for **0.1 s** against its 160%
+quota. Another worker showed 6.1 s of throttling over six days. The CPU ceiling has never come
+close to binding on any worker measured.
+
+**Do not size instances from load average.** That same worker reported a load of 4.14 on two
+cores while using 0.28% of them. Linux counts uninterruptible sleep in the load average, and on
+these workers that is memory-reclaim stall rather than runnable work — the same box reported
+12.7% memory pressure (`memory.pressure` avg300). Load here tracks memory starvation, so reading
+it as CPU demand over-provisions cores and under-provisions RAM, which is exactly backwards.
+
+Choose an instance for its memory and take whatever CPU comes with it.
+
+### Container memory scales with activity, not with challenge type
+
+Per-container `memory.current` means measured across the fleet:
+
+| worker state | mean | notes |
+| --- | --- | --- |
+| idle | 17.7 – 19.3 MiB | quiet hours, containers parked |
+| light | 88.6 MiB | a few challenges open |
+| busy | 174.9 MiB | under active use; largest single container 457 MiB |
+
+A 10x spread on one fleet. The consequence: **the slice holds a fixed amount of memory, and
+container count is that memory divided by whatever the mean happens to be.** A 16 GiB worker has
+been observed running ~300 containers (implying a ~42 MiB mixed mean), and would hold roughly 85
+if every one were busy. Both are the same worker doing its job.
+
+There is therefore no container count to design for — only a memory budget.
+
+### When to pin `container_slice_target_containers`
+
+Capacity is derived from RAM assuming a `container_slice_min_mean_container_mb` mean, which is
+deliberately a low floor. That is right when a worker runs many small containers and wasteful
+when it runs few large ones, because the shim reserve is `6 MiB x capacity` whether those
+containers exist or not.
+
+The arithmetic is simple — `MemoryMax = MemTotal - (OS + dockerd + user) - (6 x capacity)` — so
+**every container of over-estimate costs the slice 6 MiB.**
+
+* **Many small containers**, the common case: leave it `null`. The derived capacity ran 1.4x the
+  observed peak on a 16 GiB worker, which is appropriate headroom.
+* **Few large containers**: pin it. A loaded 2 GiB worker running five challenges at a 175 MiB
+  mean had capacity derived at 33, reserving 198 MiB of shim budget to serve 30 MiB of actual
+  shims. Pinning to 8 returns 150 MiB to the slice on a box that had 578 MiB free.
+
+Pin from an **observed peak concurrent container count** plus margin, never from a memory-derived
+estimate. Under-pinning is the dangerous direction: the reserve then covers fewer shims than
+actually exist, and the shortfall lands on the host rather than inside the slice.
+
+### Practical floor
+
+A worker whose challenges run ~175 MiB apiece needs roughly `175 x concurrent` plus the ~700 MiB
+flat host reserve plus `6 x concurrent`. Five such challenges want ~1.6 GiB before the OS gets
+anything, which is why 2 GiB workers OOM-kill under load no matter how the slice is tuned — that
+is an instance-size problem, not a configuration one.
+
+**4 GiB is the sensible minimum.** 8 GiB buys roughly 2.3x the concurrent challenges rather than
+2x, because the flat part of the host reserve is amortised over more containers: at a 175 MiB
+mean a 4 GiB worker sustains ~17 and an 8 GiB worker ~40.
+
 ## cgroup v1 support dropped
 
 **Affects** `multihost_docker`, `docker` · **Action required: none on jammy/noble**
