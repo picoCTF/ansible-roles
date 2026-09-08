@@ -35,6 +35,9 @@ Environment="CMGR_DB_WAL={{ cmgr_db_wal }}"
 {% if cmgr_enable_disk_quotas %}
 Environment="CMGR_ENABLE_DISK_QUOTAS={{ cmgr_enable_disk_quotas }}"
 {% endif %}
+{% if cmgr_base_pins %}
+Environment="CMGR_BASE_PINS={{ cmgr_base_pins }}"
+{% endif %}
 {% for key, value in cmgr_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"
 {% endfor %}

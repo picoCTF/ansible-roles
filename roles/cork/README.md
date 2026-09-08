@@ -63,6 +63,7 @@ unset are omitted from the unit entirely, so cork's own defaults apply.
 | cmgr_prune_age | `CMGR_PRUNE_AGE`. Must not exceed the `multihost_docker` role's container sweep age (currently `30m`); a longer value leaves cmgrd serving instances whose containers docker-reaper has already removed. Nothing validates the pair. | `30m` |
 | cmgr_db_wal | `CMGR_DB_WAL` (`false`/`off`/`0` to disable). | unset |
 | cmgr_enable_disk_quotas | `CMGR_ENABLE_DISK_QUOTAS`. | unset |
+| cmgr_base_pins | `CMGR_BASE_PINS`, the base image digest pin file. Set to the corpus root so it is **committed to the challenge repository** and versioned with the Dockerfiles it pins — cmgrd's own default of `<CMGR_DIR>/.base-pins.json` is a dotfile nobody commits and `git clean -xdf` erases, and losing the pins is not a no-op (an empty map fingerprints differently, so every challenge's next rebuild produces a differently tagged image). It sits outside every challenge directory, so it perturbs no source checksum. Nothing creates the file; `cmgrd-cli pin-refresh` writes it — commit the result. `null` leaves the variable unset. | `<CMGR_DIR>/base-pins.json` |
 | cmgr_extra_environment_vars | Extra environment variables for the cmgrd service, as a string map. | `{}` |
 
 `CMGR_INTERFACE`, `CMGR_REGISTRY_USER`, and `CMGR_REGISTRY_TOKEN` are deliberately not

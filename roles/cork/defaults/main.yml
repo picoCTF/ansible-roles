@@ -24,6 +24,24 @@ cmgr_concurrent_launches: null
 cmgr_prune_age: 30m
 cmgr_db_wal: null
 cmgr_enable_disk_quotas: null
+# Where cmgrd keeps its base image digest pins (CMGR_BASE_PINS).
+#
+# The corpus root, deliberately, so the file is COMMITTED to the challenge
+# repository and versioned with the Dockerfiles it pins. cmgrd's own default is
+# <CMGR_DIR>/.base-pins.json -- a dotfile, which nobody commits and a
+# `git clean -xdf` erases, leaving the pins as untracked state on one machine.
+# That matters because losing them is not a no-op: an empty pin map fingerprints
+# differently, so every challenge's next rebuild produces a differently tagged
+# image.
+#
+# Committed instead, a base bump is a reviewable diff, a fresh clone restores it,
+# and a rebuilt orchestrator comes back pinned. It sits outside every challenge
+# directory, so it perturbs no source checksum, and cork's own scan ignores it.
+#
+# Nothing creates the file; `cmgrd-cli pin-refresh` writes it (dirtying the
+# checkout -- commit the result), and an absent one simply means no pinning. Set
+# to null to leave CMGR_BASE_PINS unset and take cmgrd's default.
+cmgr_base_pins: "{{ cmgr_dir }}/base-pins.json"
 cmgr_extra_environment_vars: {}
 
 artifact_server_version: "latest"
