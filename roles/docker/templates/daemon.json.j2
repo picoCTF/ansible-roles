@@ -1,13 +1,13 @@
 {
-    "hosts": ["unix:///var/run/docker.sock"{% if tls_access %}, "tcp://0.0.0.0:2376"{% endif %}],
-    {% if tls_access %}
+    "hosts": ["unix:///var/run/docker.sock"{% if tls_access | bool %}, "tcp://0.0.0.0:2376"{% endif %}],
+    {% if tls_access | bool %}
     "tlsverify": true,
     "tlscacert": "{{ ca_cert_path }}",
     "tlscert": "{{ server_cert_path }}",
     "tlskey": "{{ server_key_path }}",
     {% endif %}
 
-    {% if storage_quotas %}
+    {% if storage_quotas | bool %}
     "data-root": "{{ storage_mount_point }}",
     {% endif %}
     "storage-driver": "overlay2",
@@ -22,11 +22,11 @@
         {% endfor %}
     ],
 
-    {% if userns_remap_enabled %}
+    {% if userns_remap_enabled | bool %}
     "userns-remap": "default",
     {% endif %}
 
-    {% if oci_interceptor_enabled %}
+    {% if oci_interceptor_enabled | bool %}
     {#
       runtimeArgs is deliberately omitted. Docker generates its own non-exec /bin/sh
       wrapper for any runtime with a non-empty runtimeArgs, and that shell sits between
@@ -42,6 +42,37 @@
         }
     },
     {% endif %}
+
+    {#- BuildKit's cache lives in its own store, not as untagged images, so this
+        block is the only thing that bounds it: `docker image prune` does not
+        touch it and `docker builder prune` is manual. Each policy entry's
+        filter may carry at most ONE value or dockerd refuses to start;
+        tasks/config.yml asserts that before this is written.
+
+        The whitespace control is load-bearing. A host with GC off must render
+        byte-identical to what it had before this block existed, or the template
+        task reports changed and the handler restarts dockerd on every worker in
+        the fleet for a feature none of them use.
+
+        `| bool` matters as much as the whitespace, and for the same reason. The
+        three guards in tasks/config.yml use it, so a value of "no" or "false"
+        -- what --extra-vars always produces, and what a quoted group_vars entry
+        produces -- skips every one of them. A bare truthiness test here would
+        then write GC ON, with a policy nothing validated, on the very host that
+        asked for it to be off. -#}
+    {%- if builder_gc_enabled | bool %}
+
+    "builder": {
+        "gc": {
+            "enabled": true,
+            "policy": [
+                {% for policy in builder_gc_policy %}
+                {{ policy | to_json }}{{ "," if not loop.last }}
+                {% endfor %}
+            ]
+        }
+    },
+    {%- endif %}
 
     "log-driver": "local",
     "log-opts": {
