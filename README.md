@@ -27,6 +27,7 @@ though they may be portable to other platforms with minor changes.
 | [docker](./roles/docker/README.md)                     | Configures Docker Engine with ideal settings for platform components.       |
 | [cmgr](./roles/cmgr/README.md)                         | Installs cmgr and optionally configures a cmgrd server.                     |
 | [cork](./roles/cork/README.md)                         | Installs cork (multi-host challenge orchestrator)                           |
+| [docker_builder](./roles/docker_builder/README.md)     | Provisions the cork orchestrator's Docker host for building images          |
 | [multihost_docker](./roles/multihost_docker/README.md) | Provisions a cork worker                                                    |
 | [zot](./roles/zot/README.md)                           | Installs the zot OCI registry that holds challenge images.                  |
 | [actions_runner](./roles/actions_runner/README.md)     | Installs the self-hosted GitHub Actions runner.                             |

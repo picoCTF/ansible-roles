@@ -23,7 +23,7 @@
 # systemd silently ignores them and the worker would end up with just MemoryMax,
 # CPUQuota and TasksMax: none of the scheduler priority, host memory reserve or
 # swap suppression this role is built around. Fail rather than degrade quietly.
-# Both releases the role supports (jammy, noble) are unified by default.
+# Every release this role supports is unified by default.
 - name: Verify the host uses the unified cgroup hierarchy
   ansible.builtin.assert:
     that:
@@ -32,7 +32,7 @@
       /sys/fs/cgroup/cgroup.controllers is absent, so this host is on the cgroup v1
       (legacy or hybrid) hierarchy. The container and host memory protections this
       role configures are cgroup v2 only and would be silently ignored. Boot with
-      systemd.unified_cgroup_hierarchy=1, or use a supported release (jammy, noble).
+      systemd.unified_cgroup_hierarchy=1, or use a release whose default it is.
     success_msg: "Unified cgroup hierarchy in use."
 
 - name: Read the kernel thread ceiling

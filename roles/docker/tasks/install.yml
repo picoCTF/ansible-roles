@@ -62,6 +62,23 @@
     - not (docker_pin_version | bool)
     - item in ansible_facts.packages
 
+# docker_version_pin_map is keyed by release and covers only the releases whose
+# pin has actually been chosen and tested. Indexing it directly on a release it
+# does not carry fails deep inside the apt task with an undefined-key error that
+# names neither the variable nor the release, so say it plainly first.
+- name: Fail if this release has no pinned Docker version
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution_release'] in docker_version_pin_map
+    fail_msg: >-
+      docker_pin_version is set but docker_version_pin_map has no entry for
+      {{ ansible_facts['distribution_release'] }} (it covers
+      {{ docker_version_pin_map.keys() | join(', ') }}). Add the release with the
+      apt version string to pin to, or leave docker_pin_version off to track the
+      repository.
+    quiet: yes
+  when: (docker_pin_version | bool)
+
 # Pinned packages
 - name: Ensure Docker Engine is pinned to specific version
   ansible.builtin.apt:

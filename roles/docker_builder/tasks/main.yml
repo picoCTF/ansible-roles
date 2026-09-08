@@ -1,0 +1,36 @@
+---
+# Everything the builder needs from a Docker host is what the docker role
+# already installs; what differs is a handful of settings. So this role is a
+# profile over that one rather than a third copy of it, and the vars below are
+# passed at include scope, which beats the docker role's own defaults.
+#
+# Anything not listed here is deliberately inherited, including the storage
+# mount, the firewall rules that keep builds away from the instance metadata
+# endpoint, and the container cgroup ceilings. See the README for the ones worth
+# revisiting.
+#
+# TWO PRECEDENCE TRAPS, both silent, both documented in the README:
+#
+#   1. These are include params, not task vars: they beat role defaults,
+#      group_vars, host_vars, play vars, include_vars and set_fact -- which is
+#      the intent, and is more than a task var would do, since a genuine task
+#      var loses to set_fact. They still LOSE to --extra-vars and to role
+#      params. Invoking this role from
+#      a `roles:` list with bare keys on the entry (`- role: docker_builder`
+#      followed by `docker_reaper_enabled: yes`) makes those role params, and
+#      they defeat the profile wholesale while the play still reports green. Use
+#      `include_role`, or nest the keys under `vars:`.
+#   2. Override the profile through the docker_builder_* variables below, never
+#      through the docker-role names on the right. Setting `tls_access: yes` in
+#      host_vars does nothing at all here.
+
+- name: Configure Docker for building images
+  ansible.builtin.include_role:
+    name: picoctf.ansible_roles.docker
+  vars:
+    tls_access: "{{ docker_builder_tls_access }}"
+    userns_remap_enabled: "{{ docker_builder_userns_remap_enabled }}"
+    oci_interceptor_enabled: "{{ docker_builder_oci_interceptor_enabled }}"
+    docker_reaper_enabled: "{{ docker_builder_reaper_enabled }}"
+    builder_gc_enabled: "{{ docker_builder_gc_enabled }}"
+    builder_gc_policy: "{{ docker_builder_gc_policy }}"
