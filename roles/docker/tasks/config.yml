@@ -32,6 +32,89 @@
   notify:
     - Reload systemd config
 
+# dockerd parses the BuildKit GC policy at startup and refuses to start on a
+# filter carrying more than one value ("filters expect only one value"), so a
+# bad policy does not degrade the builder, it removes it. Caught here rather
+# than after the restart handler has already taken the daemon down.
+- name: Ensure each BuildKit GC policy filter carries at most one value
+  vars:
+    # Resolved here as well as in `that`, and it is not belt-and-braces:
+    # ansible finalizes a task's arguments before running it, so fail_msg is
+    # rendered for EVERY item whether or not the assertion trips. A policy entry
+    # with no filter at all -- which the shipped default has, and which is the
+    # normal shape for the catch-all entry -- would otherwise fail the play with
+    # "object of type 'dict' has no attribute 'filter'".
+    #
+    # Undefined and null both mean "no filter" and become []. Nothing else does.
+    # `| default([], true)` would have been shorter, but its second argument
+    # replaces every falsy value -- {} and "" and 0 and false included -- so the
+    # three shape checks below would never see the shapes they exist to reject,
+    # and the template renders `policy` itself, not this variable.
+    policy_filter: "{{ [] if (policy.filter | default(none)) is none else policy.filter }}"
+  ansible.builtin.assert:
+    that:
+      # Shape before length. A filter written as a bare string rather than a
+      # list makes `| length` count characters, so a legitimate single-value
+      # filter fails with a nonsense "18-value filter (t, y, p, e, ...)"; one
+      # written as a mapping has length 1, passes, is rendered verbatim, and
+      # takes dockerd down at the next restart -- the exact outcome this assert
+      # exists to prevent.
+      - policy_filter is sequence
+      - policy_filter is not string
+      - policy_filter is not mapping
+      - "(policy_filter | length) <= 1"
+    fail_msg: >-
+      builder_gc_policy entry {{ loop_index + 1 }} has an unusable filter
+      ({{ policy_filter | to_json }}). It must be a list of at most one string:
+      dockerd accepts one value per entry and refuses to start otherwise, so
+      split a multi-value filter into one policy entry per value.
+    quiet: yes
+  loop: "{{ builder_gc_policy }}"
+  loop_control:
+    loop_var: policy
+    index_var: loop_index
+  when: builder_gc_enabled | bool
+
+- name: Ensure the BuildKit GC policy is not empty when GC is enabled
+  ansible.builtin.assert:
+    that:
+      - "builder_gc_policy | length > 0"
+    fail_msg: >-
+      builder_gc_enabled is set but builder_gc_policy is empty, which would enable GC
+      with no rules and reclaim nothing.
+    quiet: yes
+  when: builder_gc_enabled | bool
+
+# reservedSpace/maxUsedSpace/minFreeSpace are the modern BuildKit spellings. An
+# older daemon does not reject them, it ignores them -- leaving GC enabled with
+# entries that constrain nothing -- so this is checked rather than left to fail
+# visibly. ansible_facts.packages comes from install.yml, which runs first.
+- name: Fail if the BuildKit GC policy needs a newer Docker than is installed
+  vars:
+    # Resolved once, and safely: fail_msg is rendered whether or not the
+    # assertion trips (see above), so indexing ansible_facts.packages['docker-ce']
+    # inside it would raise on the very host this is meant to report about --
+    # the one with no docker-ce at all.
+    docker_apt_version: >-
+      {{ (ansible_facts.packages['docker-ce'] | default([{}]))[0].version | default('absent') }}
+    # package_facts reports the full apt version, epoch and revision included
+    # (5:29.6.0-1~ubuntu.24.04~noble). Only the upstream part is comparable.
+    docker_upstream_version: >-
+      {{ docker_apt_version | regex_replace('^absent$', '0')
+         | regex_replace('^[0-9]+:', '') | regex_replace('-.*$', '') }}
+  ansible.builtin.assert:
+    that:
+      - "'docker-ce' in ansible_facts.packages"
+      - docker_upstream_version is version(builder_gc_min_docker_version, '>=')
+    fail_msg: >-
+      builder_gc_enabled is set but the installed docker-ce is {{ docker_apt_version }}
+      (upstream {{ docker_upstream_version }}), below {{ builder_gc_min_docker_version }}.
+      An older daemon silently ignores the reservedSpace/maxUsedSpace/minFreeSpace
+      fields; use the older defaultKeepStorage/keepStorage spelling instead, or raise
+      the Docker version.
+    quiet: yes
+  when: builder_gc_enabled | bool
+
 - name: Ensure daemon config file exists
   ansible.builtin.template:
     src: "daemon.json.j2"

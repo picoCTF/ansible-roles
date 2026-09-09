@@ -10,6 +10,118 @@ you have to do.
 
 ---
 
+## The cork orchestrator moves to `docker_builder`
+
+**Affects** `docker`, `cork` · **Action required: change the play, expect a dockerd restart**
+
+The cork orchestrator has been using the plain `docker` role, whose defaults are
+shaped for a host running untrusted challenge containers. Three of them are wrong on a
+builder, and one thing it needs did not exist. The new `docker_builder` role is a profile
+over `docker` — same installation, storage, firewall and cgroups — that turns the OCI
+runtime shim off, turns docker-reaper off, drops TLS and userns-remap, and adds a
+**BuildKit build cache GC policy**. Dropping TLS means `certs.yml` is skipped entirely, so
+no certificates are configured on the builder at all; `cmgrd` reaches the daemon over the
+local unix socket.
+
+The GC policy is the substantive part. cork now builds with BuildKit, whose cache lives in
+its own store rather than as untagged images. That is what makes reclaiming disk and
+keeping the shared `apt`/`pip` layers separable goals instead of the same knob — but it
+also means nothing bounds the cache unless a policy does, since `docker image prune` does
+not touch it.
+
+**In the play**, replace the role on the orchestrator host:
+
+```yaml
+- include_role:
+    name: picoctf.ansible_roles.docker_builder   # was: picoctf.ansible_roles.docker
+  vars:
+    docker_group_users: ["ubuntu"]
+    storage_mount_point: /mnt/data
+    storage_device: /dev/disk/by-id/...   # a stable by-id symlink, not /dev/nvme1n1
+```
+
+`tls_access: no` and `userns_remap_enabled: no` can come out of the play — they are the
+role's defaults now.
+
+**One inherited fix rides along, and it can move `daemon.json` on a host that
+is not a builder.** `daemon.json.j2` gated `tls_access`, `storage_quotas`,
+`userns_remap_enabled` and `oci_interceptor_enabled` on bare truthiness while
+the tasks that act on them used `| bool`. A host that supplies one of those as
+the *string* `"no"` (a quoted value in group_vars, or `-e name=no` on the command
+line -- the `key=value` form of `--extra-vars` always yields a string, though its
+JSON and `@file` forms preserve types) therefore had the feature written into
+`daemon.json` while the tasks implementing it were skipped. The template now
+uses `| bool` in both places, so such a host renders differently and the restart
+handler fires. The change is one-way -- the template can only emit less than it
+did -- and a host using real YAML booleans, which is all of them unless someone
+overrode with a string, renders byte-identically. **Grep your inventory for
+quoted or `--extra-vars` forms of those four names before running this**; a
+`userns_remap_enabled: "no"` host will restart dockerd into a different
+data-root layout, and a `storage_quotas: "no"` one will restart it onto
+`/var/lib/docker`, leaving everything on the mounted volume invisible.
+
+**Expect a restart.** `daemon.json` gains a `builder` block and loses the
+`default-runtime`, so the handler restarts dockerd. Do it when nothing is mid-build; a
+build interrupted this way just needs re-running, but a `cmgrd` update pass does not
+recover on its own.
+
+**docker-reaper's units are not removed.** Disabling it in the role stops the tasks from
+running, but the `docker_reaper.service` and `.timer` already installed on the host stay
+and keep firing. Stop and disable them by hand once:
+
+```
+sudo systemctl disable --now docker_reaper.timer docker_reaper.service
+```
+
+**The policy needs Docker 28 or newer, and the play fails if it is not.** Enabling GC
+asserts docker-ce >= `builder_gc_min_docker_version` (28.0.0). An older daemon does not
+reject `reservedSpace`/`maxUsedSpace`/`minFreeSpace` — it ignores them, leaving GC on with
+entries that constrain nothing — so this is caught rather than left to be discovered as a
+full disk. A host below that either takes a Docker upgrade or the older
+`defaultKeepStorage`/`keepStorage` spelling. Only hosts moved to `docker_builder` are
+affected; the assert is skipped everywhere GC is off.
+
+**Watch the filter shape if you edit the policy.** dockerd accepts at most one value per
+GC policy entry's filter and *refuses to start* on more — the form BuildKit's own upstream
+documentation uses is a three-value filter. The `docker` role asserts the shape and the
+count before writing the file, so a mistake fails the play rather than the daemon.
+
+**Pass the play's variables as `include_role` vars, exactly as shown.** `storage_mount_point`
+is a role *var* in the `docker` role, so moving it into group_vars silently reverts both
+the mount point and the data-root to `/mnt/docker-data` — the volume is still mounted and
+still used, just not where the play says. And invoke the role with `include_role` rather than a `roles:` list entry: bare
+keys on such an entry are role params, which outrank the profile and quietly restore the
+worker defaults it exists to change. Both traps are spelled out in the role's README.
+
+**Nothing changes on a host that does not build.** The `builder.gc` block is rendered only
+when `builder_gc_enabled` is set, and the template's whitespace control is deliberate: with
+GC off, `daemon.json` comes out byte-identical to what it was before the block existed, so
+the template task does not report changed and the handler does not restart dockerd. That is
+checked by rendering the template at `HEAD` and in the working tree under the role's own
+defaults and diffing — worth keeping, since two stray blank lines would otherwise restart
+every challenge server in `playbook.yml` for a feature none of them use.
+
+The legacy single-host deployment is untouched for the same reason: it runs the separate
+`cmgr` role, which installs upstream `picoCTF/cmgr` and has no base-pinning to configure.
+
+Separately, the `cork` role now sets `CMGR_BASE_PINS` to `<CMGR_DIR>/base-pins.json`
+instead of leaving cmgrd's default of `<CMGR_DIR>/.base-pins.json`. The point is the
+missing dot: the pins are meant to be **committed to the challenge repository**, versioned
+with the Dockerfiles they pin, so a base bump is a reviewable diff and a rebuilt
+orchestrator comes back pinned. Generate the file once with `cmgrd-cli pin-refresh` and
+commit it. On a host where `pin-refresh` has already been run, move the dotfile to the new
+name. **This one does restart cmgrd**: the unit file gains a line, and `service.yml`
+restarts on any unit change. Persistent instances come back on their own; an update pass in
+flight does not, so apply it between passes.
+
+**Rebuild passes want the fleet in maintenance.** Not a role change, but it belongs with
+this one: cork serializes updates against each other and nothing stops the platform from
+requesting launches of a build while that build is being replaced. A launch in flight can
+collide with the update's teardown of the instances it displaces and fail the update.
+There is no gate inside cork for this.
+
+---
+
 ## Aggregate container cgroup ceilings
 
 **Affects** `multihost_docker`, `docker` · **Action required: drain the host first**

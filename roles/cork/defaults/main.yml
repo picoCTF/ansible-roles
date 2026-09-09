@@ -14,6 +14,25 @@ cmgr_dir: "{{ challenge_dir }}"
 cmgr_artifact_dir: "{{ challenge_dir }}"
 cmgr_logging: "warn"
 cmgr_registry_cert_dir: null
+
+# Drop the builder's local copy of each image once it is pushed (CMGR_PURGE_AFTER_PUSH).
+#
+# On, and the build host's disk sizing assumes it. This is what makes docker_builder's
+# BuildKit GC policy able to do anything at all: BuildKit may only evict cache records
+# nothing references, and every record backing an image still on the builder IS
+# referenced. Leave the images in place and the cache is permanently unreclaimable, so
+# no value of maxUsedSpace or minFreeSpace bounds the volume -- it fills regardless of
+# the policy and the GC never runs at all. Measured over a full corpus build on one
+# host: with this off the disk was exhausted partway through a single schema; with it
+# on the same schema finished with room to spare, same policy, same volume.
+#
+# Ignored without a registry: there is nowhere to push, the builder's copy is then the
+# only one, and removing it would break every launch. cmgrd gates that itself.
+#
+# One reason to turn it off: a small, deliberate build set where keeping the images
+# locally is the point -- inspecting what was produced, or skipping a pull on relaunch
+# -- accepting an unbounded image store for the duration. Not something to leave off.
+cmgr_purge_after_push: yes
 cmgr_ports: null
 cmgr_concurrent_launches: null
 # Must be <= the container sweep in multihost_docker (docker_reaper_command --min-age,
@@ -24,6 +43,24 @@ cmgr_concurrent_launches: null
 cmgr_prune_age: 30m
 cmgr_db_wal: null
 cmgr_enable_disk_quotas: null
+# Where cmgrd keeps its base image digest pins (CMGR_BASE_PINS).
+#
+# The corpus root, deliberately, so the file is COMMITTED to the challenge
+# repository and versioned with the Dockerfiles it pins. cmgrd's own default is
+# <CMGR_DIR>/.base-pins.json -- a dotfile, which nobody commits and a
+# `git clean -xdf` erases, leaving the pins as untracked state on one machine.
+# That matters because losing them is not a no-op: an empty pin map fingerprints
+# differently, so every challenge's next rebuild produces a differently tagged
+# image.
+#
+# Committed instead, a base bump is a reviewable diff, a fresh clone restores it,
+# and a rebuilt orchestrator comes back pinned. It sits outside every challenge
+# directory, so it perturbs no source checksum, and cork's own scan ignores it.
+#
+# Nothing creates the file; `cmgrd-cli pin-refresh` writes it (dirtying the
+# checkout -- commit the result), and an absent one simply means no pinning. Set
+# to null to leave CMGR_BASE_PINS unset and take cmgrd's default.
+cmgr_base_pins: "{{ cmgr_dir }}/base-pins.json"
 cmgr_extra_environment_vars: {}
 
 artifact_server_version: "latest"

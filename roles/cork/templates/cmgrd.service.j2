@@ -20,6 +20,9 @@ Environment="CMGR_REGISTRY={{ cmgr_registry }}"
 {% if cmgr_registry_cert_dir %}
 Environment="CMGR_REGISTRY_CERT_DIR={{ cmgr_registry_cert_dir }}"
 {% endif %}
+{% if cmgr_purge_after_push is not none %}
+Environment="CMGR_PURGE_AFTER_PUSH={{ cmgr_purge_after_push | bool | ternary('on', 'off') }}"
+{% endif %}
 {% if cmgr_ports %}
 Environment="CMGR_PORTS={{ cmgr_ports }}"
 {% endif %}
@@ -34,6 +37,9 @@ Environment="CMGR_DB_WAL={{ cmgr_db_wal }}"
 {% endif %}
 {% if cmgr_enable_disk_quotas %}
 Environment="CMGR_ENABLE_DISK_QUOTAS={{ cmgr_enable_disk_quotas }}"
+{% endif %}
+{% if cmgr_base_pins %}
+Environment="CMGR_BASE_PINS={{ cmgr_base_pins }}"
 {% endif %}
 {% for key, value in cmgr_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"

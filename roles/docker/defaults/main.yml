@@ -27,6 +27,34 @@ oci_interceptor_flags: ["--oi-readonly-networking-mounts"]
 logs_max_size: "10m"
 logs_max_files: 3
 
+# BuildKit build cache garbage collection (the "builder" block of daemon.json).
+#
+# Off by default, and meaningless on a host that does not build: only the cork
+# orchestrator does, and the docker_builder role is what turns this on. See that
+# role for the sizing.
+builder_gc_enabled: no
+# Policy entries, applied in order, rendered verbatim into daemon.json.
+#
+# CONSTRAINT, and it is not a style preference: dockerd accepts at most ONE
+# value per policy entry's filter. A two-value filter -- the form BuildKit's own
+# documented default policy uses -- makes dockerd refuse to start with
+#
+#   error initializing buildkit: error creating buildkit instance:
+#   filters expect only one value
+#
+# and it fails at daemon start, so a bad value here takes the builder down
+# rather than being ignored. Split a multi-value filter into one entry per
+# value. tasks/config.yml asserts this before writing the file.
+builder_gc_policy: []
+# Lowest Docker that understands the reservedSpace/maxUsedSpace/minFreeSpace
+# field names. Conservative, not a measured boundary: those spellings arrived
+# with BuildKit v0.16, which Docker 27.4 was the first to ship, and 29.8 is what
+# this was actually verified against. An older daemon ignores them rather than
+# rejecting them, which would leave GC on with entries that constrain nothing,
+# so tasks/config.yml refuses instead. Lower it only alongside a test on the
+# version you are lowering it to.
+builder_gc_min_docker_version: "28.0.0"
+
 container_deny_ipv4_cidrs: ["169.254.169.254/32"]
 container_deny_ipv6_cidrs: []
 

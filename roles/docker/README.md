@@ -47,8 +47,9 @@ inoperable.
 All challenge containers run inside the `limit_docker.slice` cgroup, which bounds their
 combined CPU, memory and task consumption. **Requires the unified (cgroup v2) hierarchy** --
 the role asserts on it, because `CPUWeight`, `MemorySwapMax`, `MemoryMin` and `MemoryLow`
-are all v2-only and systemd would silently ignore them on v1. Both supported releases
-(jammy, noble) are unified by default.
+are all v2-only and systemd would silently ignore them on v1. Every supported release is
+unified by default. Note `docker_version_pin_map` covers jammy and noble only, so
+`docker_pin_version` on a newer release fails the play until an entry is added.
 
 Three properties of the arrangement drive how it is configured:
 
@@ -325,6 +326,28 @@ amount of log output retained (30m across 3 files) is somewhat reduced from the 
 sufficient for the majority of use cases. The amount of output retained is customizable using the
 variables [listed below](#logging-settings).
 
+### BuildKit build cache
+
+Off by default, and only relevant on a host that builds images -- which in a cork deployment means
+the orchestrator, provisioned through the [`docker_builder`](../docker_builder/README.md) role.
+That role is where the sizing and the reasoning live; this role only renders the `builder.gc` block
+of `daemon.json`.
+
+BuildKit keeps its layer cache in its own store rather than as untagged images, so `docker image
+prune` does not touch it and nothing bounds it unless a GC policy does. Set `builder_gc_enabled` and
+supply `builder_gc_policy`.
+
+**Each policy entry's filter may carry at most one value.** dockerd parses this at startup and
+refuses to start otherwise:
+
+```
+error initializing buildkit: error creating buildkit instance: filters expect only one value
+```
+
+BuildKit's own documented default policy uses a three-value filter, so copying it from upstream
+documentation takes the daemon down. Split it into one entry per value. The role asserts this before
+writing `daemon.json`, so a bad policy fails the play rather than the daemon.
+
 ### Firewall rules
 
 Access to the [EC2 metadata endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html) is blocked from all Docker containers by default.
@@ -390,6 +413,14 @@ This is [configurable](#firewall-settings), and additional IPs can be blocked if
 | --- | --- | --- |
 | `logs_max_size` | Maximum size of an individual container log file. | `10m` |
 | `logs_max_files` | Maximum number of log files to retain per container. If rolling the logs creates excess files, the oldest are deleted. | `3` |
+
+### BuildKit build cache settings
+
+| Name | Description | Default |
+| --- | --- | --- |
+| `builder_gc_enabled` | Whether to render a `builder.gc` block into `daemon.json`. Only meaningful on a host that builds images; see [`docker_builder`](../docker_builder/README.md). | `false` |
+| `builder_gc_policy` | Policy entries, applied in order, rendered verbatim. Each entry's `filter` must be a list of **at most one value** -- more makes dockerd refuse to start, and the role asserts both the shape and the count. | `[]` |
+| `builder_gc_min_docker_version` | Minimum docker-ce the policy fields require. Enabling GC on an older daemon **fails the play**: it would not reject `reservedSpace`/`maxUsedSpace`/`minFreeSpace`, it would silently ignore them and leave GC on with entries that constrain nothing. Lower it only alongside the older `defaultKeepStorage`/`keepStorage` spelling. | `28.0.0` |
 
 ### Firewall settings
 

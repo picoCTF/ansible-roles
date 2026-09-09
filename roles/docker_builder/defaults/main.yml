@@ -1,0 +1,145 @@
+---
+# The builder profile. Each of these is fed to the docker role by tasks/main.yml,
+# so overriding one here (or in the play) changes what that role is given.
+
+# The OCI runtime shim is a worker-side control: it constrains what challenge
+# containers may do at runtime. Nothing on the builder is a challenge container,
+# and enabling it only makes the shim dockerd's default runtime, so every build
+# step and the artifact extraction container go through a wrapper that has
+# nothing to enforce.
+docker_builder_oci_interceptor_enabled: no
+
+# docker-reaper is off, and this is the one to think twice about before flipping.
+#
+# Its container and network sweeps filter on label cmgr.dynamic=true. The builder
+# runs exactly one kind of container -- cork's artifact extraction container --
+# and that one carries no labels, so the sweep matches nothing and the timer is
+# pure overhead.
+#
+# Its images sweep is worse than useless here: it runs asynchronously on a timer,
+# with no coordination with cork, and it removes with noprune false, so untagged
+# parents cascade. It can evict an image in the window between cork building it
+# and cork pushing it. Reclaiming disk on the builder is the BuildKit GC policy's
+# job (below) plus cork's own retention, both of which are synchronous with the
+# build path.
+docker_builder_reaper_enabled: no
+
+# dockerd is reached over the local unix socket by cmgrd on this same host, so
+# there is no remote client to authenticate and no server cert to issue.
+docker_builder_tls_access: no
+
+# userns-remap shifts ownership of the whole data-root and of every build's
+# filesystem. The orchestrator gains nothing from it (again, no untrusted
+# containers) and it complicates the shared /mnt/data volume that also holds the
+# challenge checkout, the database and the artifacts.
+docker_builder_userns_remap_enabled: no
+
+# BuildKit build cache garbage collection, and whether it is configured at all.
+#
+# On, because a builder with no bound on its cache is the problem this role
+# exists to solve. Exposed as a variable rather than hardcoded so that an
+# operator who needs to stop reclaiming for a while -- resizing the volume,
+# or measuring what the cache really costs -- has a way to do it. Turning it off
+# leaves the daemon's builder block unwritten entirely, which is byte-identical
+# to what a host had before this role existed and so does not restart dockerd.
+docker_builder_gc_enabled: yes
+
+# The policy itself.
+#
+# This is the mechanism that makes "bound the disk" and "keep the shared apt and
+# pip layers" separable goals. Under the classic builder they were the same
+# knob: its cache WAS untagged images, so reclaiming image space destroyed the
+# cache and the next build re-ran every install in the fleet. BuildKit's cache
+# is a separate store that `docker image prune` does not touch, and that nothing
+# bounds unless this policy does.
+#
+# Entries apply in order.
+#
+# SIZED FOR A VOLUME IT SHARES, which is the thing to keep hold of before raising
+# any of these. The storage mount also holds the challenge checkout, the database,
+# the artifact bundles, and -- where the artifact server expands them locally --
+# their expanded cache. Measured across a full corpus build, docker and everything
+# else came out roughly half and half: docker is the largest single term, but it is
+# not most of the volume. Derive these from what a deployment has spare, not from
+# its size.
+#
+# The image store is not governed here at all -- cork's retention, its
+# purge-after-push and `update --prune-old` bound that -- which is what leaves
+# room for a cache this size. Losing the cache is survivable but not free:
+# evicting a base means re-pulling it, so size it to hold the working set rather
+# than to the smallest number that fits.
+#
+# One value per filter. More makes dockerd refuse to start -- see
+# builder_gc_policy in the docker role. The fields used here are the modern
+# BuildKit ones (reservedSpace / maxUsedSpace / minFreeSpace), verified against
+# Docker 29.8; the older defaultKeepStorage / keepStorage spelling also parses
+# but is not mixed in.
+#
+# The eviction behaviour has now been watched, across a full corpus build:
+#
+#   - THE POLICY BOUNDS EVICTABLE CACHE, NOT DISK. BuildKit may only evict records
+#     that nothing references. Records backing images still present on the builder
+#     are pinned, and `docker system df` counts them inside Build Cache anyway, so
+#     the reported cache size sits well above maxUsedSpace while the RECLAIMABLE
+#     figure sits on it. Reading the total and concluding the policy is broken is
+#     the trap here; read the reclaimable column.
+#   - It follows that this policy does nothing at all without cork's
+#     purge-after-push (cmgr_purge_after_push, cork role). With images retained
+#     there is nothing evictable, and the volume fills whatever these are set to.
+#   - minFreeSpace and maxUsedSpace bind under different conditions and only one
+#     binds at a time. On a volume too small for both, minFreeSpace goes first and
+#     silently holds the cache below maxUsedSpace: the cache then runs smaller than
+#     configured and nothing reports it. If minFreeSpace is the one doing the work,
+#     the volume is undersized.
+#   - reservedSpace was never observed binding.
+#
+# A worked example, so these are not only numbers. For a corpus of roughly 500
+# challenges at 5 seeds each (~2,500 builds), with purge-after-push on and the
+# registry NOT sharing this volume:
+#
+#   challenge checkout, incl. git and LFS objects      ~11 GB
+#   artifact tarballs cork writes                       ~5 GB
+#   expanded artifact cache, if served from this host  ~30 GB  <- unbounded, and
+#                                                                nothing here caps
+#                                                                it
+#   docker: this cache (25) + records pinned by
+#           resident images + the images themselves    ~47 GB
+#   minFreeSpace, which is never usable                 10 GB
+#                                                      -------
+#                                                      ~105 GB
+#
+# which wants a volume around 128 GB. The two terms to watch are the expanded
+# cache -- bound it, or serve artifacts from object storage and it disappears --
+# and the checkout, where the git history is negligible but the LFS objects are
+# stored twice, once under .git/lfs and once in the working tree.
+docker_builder_gc_policy:
+  # One entry, and it is the whole cache. BuildKit evaluates policies in order
+  # and each one's limits apply to the records IT selects, so an entry with no
+  # filter selects everything and its maxUsedSpace is the total.
+  #
+  # A `type==source.local` entry capping build contexts used to sit above this
+  # one. It was removed because it matched nothing: a real cork build cache
+  # holds only `regular` records -- pulled base image layers and exec results.
+  # cork hands BuildKit a freshly synthesized context tar per build and BuildKit
+  # does not keep it as a cache record, so there was nothing to cap.
+  #
+  # 25GB because the working set is much larger than it looks. Measured on a
+  # cache built from four small example challenges: one apt layer alone was
+  # 615MB, and a base image is itself a record (ubuntu:24.04 at 225MB). A fleet
+  # with dozens of distinct bases and toolchain layers of a gigabyte or two runs
+  # into tens of gigabytes before anything interesting is cached. A ceiling
+  # under that thrashes, and thrashing is not cheap here: evicting a base means
+  # re-pulling it from the registry and re-running every shared install, which
+  # is the exposure pinning exists to remove.
+  #
+  # reservedSpace is the floor GC will not go below. maxUsedSpace caps the cache
+  # regardless of free disk.
+  #
+  # minFreeSpace is a backstop on the FILESYSTEM, not on docker's share, and it
+  # has to be a figure the disk can actually reach. Set above what is achievable
+  # once the corpus, artifacts and image store have taken their part, GC prunes
+  # the whole cache on every pass and still never satisfies it -- the feature
+  # then looks broken rather than conservative.
+  - reservedSpace: "2GB"
+    maxUsedSpace: "25GB"
+    minFreeSpace: "10GB"

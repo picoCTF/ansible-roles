@@ -58,11 +58,13 @@ unset are omitted from the unit entirely, so cork's own defaults apply.
 | cmgr_artifact_dir | `CMGR_ARTIFACT_DIR`. Also used by the artifact server. | `/challenges` |
 | cmgr_logging | Sets `CMGR_LOGGING`, but **cmgrd ignores it** — it hardcodes `INFO`. | `warn` |
 | cmgr_registry_cert_dir | `CMGR_REGISTRY_CERT_DIR`. | unset |
+| cmgr_purge_after_push | `CMGR_PURGE_AFTER_PUSH`. Drops the builder's local copy of each image once it is pushed. **The `docker_builder` GC policy depends on this** — BuildKit may only evict cache records nothing references, so images retained on the builder pin the cache and no `maxUsedSpace`/`minFreeSpace` value bounds the volume. Ignored without a registry (nothing is pushed, so the local copy is the only one). `null` leaves the variable unset. | `yes` |
 | cmgr_ports | `CMGR_PORTS`, e.g. `49152-65535`. Consider pairing with the `os` role's `ephemeral_port_range`. | unset |
 | cmgr_concurrent_launches | `CMGR_CONCURRENT_LAUNCHES` (1 or 2). | unset |
 | cmgr_prune_age | `CMGR_PRUNE_AGE`. Must not exceed the `multihost_docker` role's container sweep age (currently `30m`); a longer value leaves cmgrd serving instances whose containers docker-reaper has already removed. Nothing validates the pair. | `30m` |
 | cmgr_db_wal | `CMGR_DB_WAL` (`false`/`off`/`0` to disable). | unset |
 | cmgr_enable_disk_quotas | `CMGR_ENABLE_DISK_QUOTAS`. | unset |
+| cmgr_base_pins | `CMGR_BASE_PINS`, the base image digest pin file. Set to the corpus root so it is **committed to the challenge repository** and versioned with the Dockerfiles it pins — cmgrd's own default of `<CMGR_DIR>/.base-pins.json` is a dotfile nobody commits and `git clean -xdf` erases, and losing the pins is not a no-op (an empty map fingerprints differently, so every challenge's next rebuild produces a differently tagged image). It sits outside every challenge directory, so it perturbs no source checksum. Nothing creates the file; `cmgrd-cli pin-refresh` writes it — commit the result. `null` leaves the variable unset. | `<CMGR_DIR>/base-pins.json` |
 | cmgr_extra_environment_vars | Extra environment variables for the cmgrd service, as a string map. | `{}` |
 
 `CMGR_INTERFACE`, `CMGR_REGISTRY_USER`, and `CMGR_REGISTRY_TOKEN` are deliberately not
