@@ -20,6 +20,9 @@ Environment="CMGR_REGISTRY={{ cmgr_registry }}"
 {% if cmgr_registry_cert_dir %}
 Environment="CMGR_REGISTRY_CERT_DIR={{ cmgr_registry_cert_dir }}"
 {% endif %}
+{% if cmgr_purge_after_push is not none %}
+Environment="CMGR_PURGE_AFTER_PUSH={{ cmgr_purge_after_push | bool | ternary('on', 'off') }}"
+{% endif %}
 {% if cmgr_ports %}
 Environment="CMGR_PORTS={{ cmgr_ports }}"
 {% endif %}

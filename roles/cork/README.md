@@ -58,6 +58,7 @@ unset are omitted from the unit entirely, so cork's own defaults apply.
 | cmgr_artifact_dir | `CMGR_ARTIFACT_DIR`. Also used by the artifact server. | `/challenges` |
 | cmgr_logging | Sets `CMGR_LOGGING`, but **cmgrd ignores it** — it hardcodes `INFO`. | `warn` |
 | cmgr_registry_cert_dir | `CMGR_REGISTRY_CERT_DIR`. | unset |
+| cmgr_purge_after_push | `CMGR_PURGE_AFTER_PUSH`. Drops the builder's local copy of each image once it is pushed. **The `docker_builder` GC policy depends on this** — BuildKit may only evict cache records nothing references, so images retained on the builder pin the cache and no `maxUsedSpace`/`minFreeSpace` value bounds the volume. Ignored without a registry (nothing is pushed, so the local copy is the only one). `null` leaves the variable unset. | `yes` |
 | cmgr_ports | `CMGR_PORTS`, e.g. `49152-65535`. Consider pairing with the `os` role's `ephemeral_port_range`. | unset |
 | cmgr_concurrent_launches | `CMGR_CONCURRENT_LAUNCHES` (1 or 2). | unset |
 | cmgr_prune_age | `CMGR_PRUNE_AGE`. Must not exceed the `multihost_docker` role's container sweep age (currently `30m`); a longer value leaves cmgrd serving instances whose containers docker-reaper has already removed. Nothing validates the pair. | `30m` |
