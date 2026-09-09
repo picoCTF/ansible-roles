@@ -2,3 +2,4 @@
 fetched/
 .vagrant/
 example-playbook.yml
+.ansible/
