@@ -55,13 +55,13 @@ docker_builder_gc_enabled: yes
 #
 # Entries apply in order.
 #
-# SIZED FOR A VOLUME THAT IS MOSTLY NOT DOCKER, which is the thing to keep hold
-# of before raising any of these. The storage mount is shared with the challenge
-# checkout, the database and the artifact bundles, and on a populated deployment
-# those can take most of the volume before docker has stored anything at all.
-# What is left for the image store and this cache together is a fraction of the
-# disk, so the cache is the small half of that fraction rather than a third of
-# the volume. Derive these from what a deployment has spare, not from its size.
+# SIZED FOR A VOLUME IT SHARES, which is the thing to keep hold of before raising
+# any of these. The storage mount also holds the challenge checkout, the database,
+# the artifact bundles, and -- where the artifact server expands them locally --
+# their expanded cache. Measured across a full corpus build, docker and everything
+# else came out roughly half and half: docker is the largest single term, but it is
+# not most of the volume. Derive these from what a deployment has spare, not from
+# its size.
 #
 # The image store is not governed here at all -- cork's retention, its
 # purge-after-push and `update --prune-old` bound that -- which is what leaves
@@ -73,8 +73,45 @@ docker_builder_gc_enabled: yes
 # builder_gc_policy in the docker role. The fields used here are the modern
 # BuildKit ones (reservedSpace / maxUsedSpace / minFreeSpace), verified against
 # Docker 29.8; the older defaultKeepStorage / keepStorage spelling also parses
-# but is not mixed in. dockerd accepting them is verified; the eviction
-# behaviour below is from BuildKit's documentation and has not been watched.
+# but is not mixed in.
+#
+# The eviction behaviour has now been watched, across a full corpus build:
+#
+#   - THE POLICY BOUNDS EVICTABLE CACHE, NOT DISK. BuildKit may only evict records
+#     that nothing references. Records backing images still present on the builder
+#     are pinned, and `docker system df` counts them inside Build Cache anyway, so
+#     the reported cache size sits well above maxUsedSpace while the RECLAIMABLE
+#     figure sits on it. Reading the total and concluding the policy is broken is
+#     the trap here; read the reclaimable column.
+#   - It follows that this policy does nothing at all without cork's
+#     purge-after-push (cmgr_purge_after_push, cork role). With images retained
+#     there is nothing evictable, and the volume fills whatever these are set to.
+#   - minFreeSpace and maxUsedSpace bind under different conditions and only one
+#     binds at a time. On a volume too small for both, minFreeSpace goes first and
+#     silently holds the cache below maxUsedSpace: the cache then runs smaller than
+#     configured and nothing reports it. If minFreeSpace is the one doing the work,
+#     the volume is undersized.
+#   - reservedSpace was never observed binding.
+#
+# A worked example, so these are not only numbers. For a corpus of roughly 500
+# challenges at 5 seeds each (~2,500 builds), with purge-after-push on and the
+# registry NOT sharing this volume:
+#
+#   challenge checkout, incl. git and LFS objects      ~11 GB
+#   artifact tarballs cork writes                       ~5 GB
+#   expanded artifact cache, if served from this host  ~30 GB  <- unbounded, and
+#                                                                nothing here caps
+#                                                                it
+#   docker: this cache (25) + records pinned by
+#           resident images + the images themselves    ~47 GB
+#   minFreeSpace, which is never usable                 10 GB
+#                                                      -------
+#                                                      ~105 GB
+#
+# which wants a volume around 128 GB. The two terms to watch are the expanded
+# cache -- bound it, or serve artifacts from object storage and it disappears --
+# and the checkout, where the git history is negligible but the LFS objects are
+# stored twice, once under .git/lfs and once in the working tree.
 docker_builder_gc_policy:
   # One entry, and it is the whole cache. BuildKit evaluates policies in order
   # and each one's limits apply to the records IT selects, so an entry with no
