@@ -1,0 +1,46 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  roles:
+    name: Structural checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install checker dependencies
+        run: python3 -m pip install --user --quiet pyyaml jinja2
+
+      # Blocking, and deliberately narrow: every YAML file parses, every
+      # template parses, and every variable a template reads is defined
+      # somewhere in its role. These are the mistakes that otherwise surface
+      # only when a play runs against a real host.
+      - name: Roles parse and templates resolve
+        run: python3 ci/check_roles.py
+
+  ansible-lint:
+    name: ansible-lint (advisory)
+    runs-on: ubuntu-latest
+    # Advisory on purpose. Its two largest findings on this repository are
+    # var-naming[no-role-prefix] and truthy -- unprefixed variable names and the
+    # yes/no idiom -- both of which are long-standing choices here rather than
+    # defects. Gating on them would mean a mass rename, so the report is
+    # published for review and does not fail the build.
+    continue-on-error: true
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ansible-lint
+        run: python3 -m pip install --user --quiet ansible-lint
+
+      - name: Run ansible-lint
+        run: ~/.local/bin/ansible-lint -f pep8 --nocolor || true
