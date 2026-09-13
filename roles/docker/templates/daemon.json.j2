@@ -14,7 +14,8 @@
     "firewall-backend": "{{ docker_firewall_backend }}",
 
     "cgroup-parent": "{{ parent_cgroup }}",
-    "exec-opts": ["native.cgroupdriver=systemd"],
+    "exec-opts": ["native.cgroupdriver=systemd"],{% if docker_bip %}
+    "bip": "{{ docker_bip }}",{% endif %}
 
     "default-address-pools": [
         {% for pool in network_ip_pools %}
