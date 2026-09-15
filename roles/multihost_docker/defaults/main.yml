@@ -22,6 +22,11 @@ multihost_docker_registry: "REPLACE_ME:5000"
 
 storage_quotas: yes
 storage_device: "/dev/nvme1n1"
+# Filesystem label for that volume, and what fstab mounts by. The device above
+# is used only to format it the first time: a label travels inside the
+# filesystem, so it survives a snapshot where a device path does not, which is
+# what lets a worker image be cloned onto a volume AWS gives a new id.
+storage_label: "docker-data"
 
 network_ip_pools: ["192.168.0.0/16"]
 network_prefix_length: 29
