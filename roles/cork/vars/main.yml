@@ -1,10 +1,50 @@
 ---
-challenge_dir: "/challenges"
+# The role's own layout, and every one of these is overridable. Three separate
+# directories rather than one, because they have three different lifetimes: the
+# tree is a checkout, the bundles are output, and the database is the thing that
+# must not be lost, since an orchestrator records each build under the id this
+# database gave it. Collapsing them -- which this role used to do, and the cmgr
+# role still does -- puts the database and the bundles INSIDE a git checkout and
+# points clean-upgrade's rm -rf at the tree.
+cork_root: "/cork"
+challenge_dir: "{{ cork_root }}/challenges"
+artifact_dir: "{{ cork_root }}/artifacts"
 install_location: "/usr/local/bin"
-cork_binaries_filename: "cmgr_linux_amd64.tar.gz"
 
-registry_certs_d_path: "/etc/docker/certs.d/{{ cmgr_registry }}"
+# The release asset, by architecture. cork builds every asset natively rather
+# than cross-compiling (CGO is on for go-sqlite3), so there is one per platform
+# and an orchestrator on Graviton needs the arm64 one. install.yml asserts the
+# host's architecture is one this map knows, rather than letting a 404 from the
+# download explain it.
+cork_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+cork_arch: "{{ cork_arch_map[ansible_facts['architecture']] | default('') }}"
+cork_binaries_filename: "cork_linux_{{ cork_arch }}.tar.gz"
+
+# The binaries the tarball carries. corkd is the daemon, cork its CLI, and
+# cork-build the build plane. It also carries cmgrd and cmgrd-cli as symlinks to
+# the first two, for installers written before the rename; this role installs
+# the current names and lets those go.
+cork_daemon_binary: "corkd"
+cork_cli_binary: "cork"
+# The real cork-build binary sits beside the wrapper that carries its
+# environment, under a name nobody types. Same shape as the cmgr role's
+# cmgr_bin, and for the same reason: the wrapper owns the name on PATH.
+cork_build_binary_path: "{{ install_location }}/cork-build_bin"
+cork_build_wrapper_path: "{{ install_location }}/cork-build"
+cork_config_dir: "/etc/cork"
+
+registry_certs_d_path: "/etc/docker/certs.d/{{ cork_registry }}"
 
 systemd_unit_dir: "/etc/systemd/system/"
 
-artifact_server_binary_filename: "cmgr-artifact-server_linux_amd64.tar.gz"
+artifact_server_binary_filename: "cmgr-artifact-server_linux_{{ cork_arch }}.tar.gz"
+
+# systemd spells architectures its own way, and ConditionArchitecture silently
+# skips a unit whose value does not match -- so an arm64 host with the x86-64
+# condition would install a service that never starts and reports no error.
+cork_condition_architecture_map:
+  amd64: x86-64
+  arm64: arm64
+cork_condition_architecture: "{{ cork_condition_architecture_map[cork_arch] | default('') }}"

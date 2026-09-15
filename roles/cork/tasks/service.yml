@@ -1,32 +1,75 @@
 ---
 
-# Configure cmgrd to run as a systemd service.
+# Configure corkd to run as a systemd service.
 
-- name: Ensure challenge directory exists and is root-only
+# The pre-rename unit, removed before this role enables its own. A host that was
+# provisioned before the rename has cmgrd.service enabled and running, and this
+# role writes corkd.service beside it -- two daemons on one port and one
+# database, with the second to start losing. Removed rather than stopped: an
+# enabled unit comes back at the next boot.
+#
+# It is the same file the legacy cmgr role writes, which is intentional. A host
+# being given corkd is a host that is no longer running cmgrd, and the two cannot
+# coexist whichever of them put the unit there.
+- name: Check for the pre-rename cmgrd unit
+  ansible.builtin.stat:
+    path: "{{ systemd_unit_dir }}/cmgrd.service"
+  register: legacy_cmgrd_unit
+
+- name: Stop and disable the pre-rename cmgrd service
+  ansible.builtin.systemd:
+    name: cmgrd.service
+    state: stopped
+    enabled: no
+  when: legacy_cmgrd_unit.stat.exists
+
+- name: Remove the pre-rename cmgrd unit
   ansible.builtin.file:
-    path: "{{ cmgr_dir }}"
+    path: "{{ systemd_unit_dir }}/cmgrd.service"
+    state: absent
+  when: legacy_cmgrd_unit.stat.exists
+  notify:
+    - Reload systemd config
+
+# The database's directory, which is the challenge directory only on a host that
+# builds. An external daemon has no tree, so without this its database would have
+# nowhere to live and corkd would fail to open it.
+- name: Ensure the database directory exists
+  ansible.builtin.file:
+    path: "{{ cork_db | dirname }}"
     state: directory
     mode: "0770"
 
-- name: Ensure cmgrd systemd unit exists
+# Only where this daemon builds. An external daemon has no tree: it reads no
+# challenge directory, and creating one would leave an empty directory that
+# looks like a checkout nobody has populated.
+- name: Ensure challenge directory exists and is root-only
+  ansible.builtin.file:
+    path: "{{ cork_dir }}"
+    state: directory
+    mode: "0770"
+  when: cork_build_plane != "external"
+
+- name: Ensure corkd systemd unit exists
   ansible.builtin.template:
-    src: "cmgrd.service.j2"
-    dest: "{{ systemd_unit_dir }}/cmgrd.service"
+    src: "corkd.service.j2"
+    dest: "{{ systemd_unit_dir }}/corkd.service"
     lstrip_blocks: yes
     force: yes
-  register: cmgrd_unit
+    mode: "0644"
+  register: corkd_unit
   notify:
     - Reload systemd config
 
 - name: Ensure systemd unit is enabled
   ansible.builtin.systemd:
-    name: cmgrd.service
+    name: corkd.service
     daemon_reload: yes
     enabled: yes
 
-- name: Determine whether to restart the cmgrd service
+- name: Determine whether to restart the corkd service
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:
-    - Restart cmgrd
-  when: installation_required or cmgrd_unit.changed
+    - Restart corkd
+  when: installation_required or corkd_unit.changed

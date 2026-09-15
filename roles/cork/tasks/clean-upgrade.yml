@@ -1,17 +1,24 @@
 ---
-# Attempts to remove any existing cmgr database, artifact tarballs, and local build
-# images prior to upgrading cork. (Challenge containers live on the workers, not on the
-# orchestrator's local build daemon, so only local build images are pruned here.)
+# Removes this host's cork database, its artifact tarballs and, where it builds,
+# its local images before upgrading.
+#
+# Destructive, and more so than it looks on a build plane: that database is what
+# records which build id each artifact bundle is named by, and an orchestrator
+# has adopted those ids. Clearing it here makes every later hand-over conflict
+# with rows the orchestrator already holds. See BUILDER.md on recovering a lost
+# plane database -- the answer is to release every schema that orchestrator
+# holds from this plane and build them together, not to wipe one side.
 
-- name: Ensure cmgrd service is stopped
+- name: Ensure corkd service is stopped
   ansible.builtin.service:
-    name: cmgrd
+    name: corkd
     state: stopped
   become: yes
-  register: cmgrd_service
-  failed_when: cmgrd_service is failed and not 'Could not find the requested service' in cmgrd_service.msg
+  register: corkd_service
+  failed_when: corkd_service is failed and not 'Could not find the requested service' in corkd_service.msg
   retries: 0
-  until: cmgrd_service.status.ActiveState == "stopped"
+  until: corkd_service.status.ActiveState == "stopped"
+  when: cork_daemon_enabled | bool
 
 - name: Ensure cmgr-artifact-server service is stopped
   ansible.builtin.service:
@@ -22,14 +29,19 @@
   failed_when: artifact_server_service is failed and not 'Could not find the requested service' in artifact_server_service.msg
   retries: 0
   until: artifact_server_service.status.ActiveState == "stopped"
+  when: artifact_server_enabled | bool
 
-- name: Remove existing cmgr database
+- name: Remove existing cork database
   ansible.builtin.file:
-    path: "{{ cmgr_db }}"
+    path: "{{ cork_db }}"
     state: absent
 
 - name: Remove existing artifact tarballs
-  ansible.builtin.shell: /bin/rm -rf {{ cmgr_artifact_dir }}/*
+  ansible.builtin.shell: /bin/rm -rf {{ cork_artifact_dir }}/*
+  when: artifact_server_enabled | bool
 
+# Only where this host builds. An orchestrator on an external build plane has no
+# docker daemon at all, and the images are on the plane and in the registry.
 - name: Prune unused Docker images
   ansible.builtin.shell: docker image prune --all --force
+  when: cork_build_plane != "external" or (cork_builder_enabled | bool)

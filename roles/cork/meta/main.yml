@@ -1,6 +1,6 @@
 galaxy_info:
   author: picoCTF team
-  description: Installs cork, the multi-host challenge orchestrator (cmgrd + cmgrd-cli)
+  description: Installs cork -- corkd and its CLI on an orchestrator, cork-build on a build plane
   company: Carnegie Mellon University
 
   # If the issue tracker for your role is not on github, uncomment the

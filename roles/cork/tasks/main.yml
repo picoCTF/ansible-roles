@@ -1,7 +1,7 @@
 ---
 
 - include_tasks: clean-upgrade.yml
-  when: (upgrade | bool) and (clean_upgrade | bool)
+  when: (cork_upgrade | bool) and (cork_clean_upgrade | bool)
   args:
     apply:
       become: yes
@@ -17,18 +17,30 @@
     apply:
       become: yes
 
+# corkd serves instances; a build plane runs none and has no unit.
 - include_tasks: service.yml
+  when: cork_daemon_enabled | bool
   args:
     apply:
       become: yes
 
+# cork-build's environment and the destinations it routes against.
+- include_tasks: build-plane.yml
+  when: cork_builder_enabled | bool
+  args:
+    apply:
+      become: yes
+
+# The artifact server publishes what a build plane writes, so the binary and the
+# unit travel together: a host that does not run it does not get it.
 - include_tasks: artifact-server-install.yml
+  when: artifact_server_enabled | bool
   args:
     apply:
       become: yes
 
 - include_tasks: artifact-server-service.yml
-  when: artifact_server_service_enabled | bool
+  when: artifact_server_enabled | bool
   args:
     apply:
       become: yes

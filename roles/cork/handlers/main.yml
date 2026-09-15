@@ -4,11 +4,15 @@
     daemon_reload: yes
   become: yes
 
-- name: Restart cmgrd
+# Notified by tasks that also run on a build plane, where there is no daemon to
+# restart -- the certs are deployed on both halves. The listen guard keeps that
+# from failing a play on a host whose unit was never written.
+- name: Restart corkd
   ansible.builtin.service:
-    name: cmgrd
+    name: corkd
     state: restarted
   become: yes
+  when: cork_daemon_enabled | bool
 
 - name: Restart cmgr artifact server
   ansible.builtin.service:
