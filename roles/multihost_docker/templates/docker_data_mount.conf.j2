@@ -1,0 +1,13 @@
+# dockerd's data-root is on the separate XFS volume (see daemon.json), and
+# nothing else connects the two. Without this, a data volume that fails to
+# mount leaves dockerd running perfectly happily on a directory of the same
+# name on the root volume: a fraction of the space, and no XFS project quotas,
+# which is the entire reason the volume exists. Nothing reports it. The first
+# sign is a challenge filling the root disk.
+#
+# Requiring the mount turns that into a clean stop. dockerd does not start, the
+# telemetry endpoint never reports healthy, and an autoscaled worker is
+# abandoned by its launch lifecycle hook and replaced rather than joining the
+# fleet in a state where it cannot enforce a quota.
+[Unit]
+RequiresMountsFor={{ storage_mount_point }}

@@ -3,18 +3,79 @@
 # Use a separate XFS volume for Docker graph storage in order
 # to enable volume/writable layer storage quotas
 
+# The volume is found once by device and mounted thereafter by filesystem
+# label. storage_device is only used to format it and to relabel one formatted
+# before this role wrote labels; fstab names the label.
+#
+# That distinction is what makes a worker image clonable. The by-id path AWS
+# gives an EBS volume is built from the volume ID, and restoring a snapshot
+# produces a new volume with a new ID -- so an image baked from a worker whose
+# fstab named a device comes up with a perfectly good, correctly formatted,
+# fully populated filesystem that nothing mounts. A label is part of the block
+# data, so it survives the snapshot along with everything else on the volume.
+
 - name: Ensure Docker data volume is formatted as XFS
   community.general.filesystem:
     dev: "{{ storage_device }}"
     fstype: xfs
+    opts: "-L {{ storage_label }}"
+
+- name: Read the Docker data volume's filesystem label
+  ansible.builtin.command:
+    argv: ["blkid", "-s", "LABEL", "-o", "value", "{{ storage_device }}"]
+  register: storage_volume_label
+  changed_when: no
+  # An unlabelled device is the answer here, not a failure: blkid exits
+  # non-zero rather than printing nothing, and the next task writes one.
+  failed_when: no
+
+- name: Label the Docker data volume while it is mounted
+  # Every worker built before this role used labels reaches here. XFS can be
+  # relabelled online, which is the only option available: the mount is
+  # dockerd's data-root, so unmounting it would mean stopping the daemon and
+  # killing every running challenge.
+  ansible.builtin.command:
+    argv:
+      - xfs_io
+      - "-x"
+      - "-c"
+      - "label -s {{ storage_label }}"
+      - "{{ storage_mount_point }}"
+  when:
+    - storage_volume_label.stdout | trim != storage_label
+    - storage_mount_point in ansible_mounts | map(attribute='mount')
+  changed_when: yes
+
+- name: Label the Docker data volume while it is unmounted
+  ansible.builtin.command:
+    argv: ["xfs_admin", "-L", "{{ storage_label }}", "{{ storage_device }}"]
+  when:
+    - storage_volume_label.stdout | trim != storage_label
+    - storage_mount_point not in ansible_mounts | map(attribute='mount')
+  changed_when: yes
+
+- name: Ensure the Docker data volume is recorded in fstab, by label
+  # Deliberately "present" rather than "mounted". On a worker that is already
+  # serving, this mount is dockerd's data-root and therefore busy, so
+  # remounting it to pick up the new source would fail -- and there is nothing
+  # to pick up, since it is the same filesystem either way. The entry takes
+  # effect at the next boot, which for an image baked from this host is the
+  # only boot that matters.
+  ansible.posix.mount:
+    path: "{{ storage_mount_point }}"
+    src: "LABEL={{ storage_label }}"
+    fstype: xfs
+    opts: pquota
+    state: present
 
 - name: Ensure the Docker data volume is mounted
   ansible.posix.mount:
     path: "{{ storage_mount_point }}"
-    src: "{{ storage_device }}"
+    src: "LABEL={{ storage_label }}"
     fstype: xfs
     opts: pquota
     state: mounted
+  when: storage_mount_point not in ansible_mounts | map(attribute='mount')
 
 - name: Grow the filesystem if necessary
   # community.general.filesystem cannot grow XFS filesystems unless they are already
