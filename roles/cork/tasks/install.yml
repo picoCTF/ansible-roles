@@ -1,28 +1,69 @@
 ---
 
-# Install cork (cmgrd daemon + cmgrd-cli client)
+# Install cork: corkd (the daemon) and cork (its CLI) where instances are
+# served, cork-build where images are built.
 
+# A registry is required by both halves of a split deployment: the build plane pushes
+# every image it builds there, and an external daemon checks and untags there with no
+# docker daemon of its own to do it. A one-box deployment has neither half -- it builds
+# and runs on the same daemon -- so it may leave this unset, and cork then keeps the
+# images it builds locally and pushes nothing.
 - name: Assert a registry address is configured
   ansible.builtin.assert:
     that:
-      - cmgr_registry is defined
-      - cmgr_registry | length > 0
-      - "'REPLACE_ME' not in cmgr_registry"
+      - cork_registry | default("", true) | length > 0
+      - "'REPLACE_ME' not in (cork_registry | default('', true))"
     fail_msg: >-
-      cmgr_registry is still the placeholder. Set it to the zot registry's host:port; it
-      names the certs.d directory and must match multihost_docker_registry on the workers.
+      cork_registry is unset or still the placeholder, and this host needs one: a build
+      plane pushes every image there, and a daemon on an external build plane has no other
+      way to check or retire a tag. Set it to the zot registry's host:port -- it also
+      names the certs.d directory, and every host in the deployment must agree on it,
+      since it is the registry images are tagged with.
+  when: cork_build_plane == "external" or (cork_builder_enabled | bool)
 
-- name: Check whether cmgrd is installed
+- name: Assert the build plane setting is one cork understands
+  ansible.builtin.assert:
+    that:
+      - cork_build_plane in ["local", "external"]
+    fail_msg: >-
+      cork_build_plane must be 'local' (this host builds on its own docker daemon) or
+      'external' (something else builds and hands the finished builds over), not
+      '{{ cork_build_plane }}'.
+
+- name: Assert this architecture has a cork release
+  ansible.builtin.assert:
+    that:
+      - cork_arch | length > 0
+    fail_msg: >-
+      cork publishes a release per architecture and has none for
+      '{{ ansible_facts['architecture'] | default('unknown -- this play gathered no facts') }}'
+      (known: {{ cork_arch_map.keys() | join(', ') }}).
+
+- name: Assert this host has something to install
+  ansible.builtin.assert:
+    that:
+      - (cork_daemon_enabled | bool) or (cork_builder_enabled | bool)
+    fail_msg: >-
+      Neither cork_daemon_enabled nor cork_builder_enabled is set, so this role would
+      install binaries and run nothing. An orchestrator wants the daemon; a build plane
+      wants the builder (the cork_build role sets that up).
+
+# Which binary answers for the installed version. corkd reports it locally,
+# which the CLI cannot do mid-upgrade (its `version` is an HTTP call to a
+# running daemon). A build plane has no daemon, so cork-build answers there.
+- name: Determine which binary reports the installed version
+  ansible.builtin.set_fact:
+    cork_version_probe_path: "{{ (cork_daemon_enabled | bool) | ternary(install_location + '/' + cork_daemon_binary, cork_build_binary_path) }}"
+
+- name: Check whether cork is installed
   ansible.builtin.stat:
-    path: "{{ install_location }}/cmgrd"
-  register: cmgrd_binary
+    path: "{{ cork_version_probe_path }}"
+  register: cork_binary
 
-# cmgrd reports its own version locally; cmgrd-cli's `version` is an HTTP call to a
-# running daemon, which is not available mid-upgrade.
 - name: Determine installed cork version
   ansible.builtin.command:
-    cmd: "{{ install_location }}/cmgrd --version"
-  when: (upgrade | bool) and cmgrd_binary.stat.exists
+    cmd: "{{ cork_version_probe_path }} --version"
+  when: (cork_upgrade | bool) and cork_binary.stat.exists
   register: cork_version_output
   changed_when: false
 
@@ -32,11 +73,11 @@
     method: HEAD
     follow_redirects: safe
   register: latest_version_response
-  when: version == "latest" and (not cmgrd_binary.stat.exists or (upgrade | bool))
+  when: cork_version == "latest" and (not cork_binary.stat.exists or (cork_upgrade | bool))
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    installation_required: "{{ (clean_upgrade | bool) or (not cmgrd_binary.stat.exists) or ((upgrade | bool) and version != 'latest' and (cork_version_output.stdout | replace('Version:', '') | trim) != version) or ((upgrade | bool) and version == 'latest' and (cork_version_output.stdout | replace('Version:', '') | trim) != latest_version_response.url.split('/tag/')[1]) }}"
+    installation_required: "{{ (cork_clean_upgrade | bool) or (not cork_binary.stat.exists) or ((cork_upgrade | bool) and cork_version != 'latest' and (cork_version_output.stdout | replace('Version:', '') | trim) != cork_version) or ((cork_upgrade | bool) and cork_version == 'latest' and (cork_version_output.stdout | replace('Version:', '') | trim) != latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:
@@ -47,7 +88,7 @@
 - name: Download cork binaries
   ansible.builtin.get_url:
     dest: "{{ download_dir.path }}"
-    url: "{{ cork_github_url }}/releases/download/{{ latest_version_response.url.split('/tag/')[1] if version == 'latest' else version }}/{{ cork_binaries_filename }}"
+    url: "{{ cork_github_url }}/releases/download/{{ latest_version_response.url.split('/tag/')[1] if cork_version == 'latest' else cork_version }}/{{ cork_binaries_filename }}"
   when: installation_required
 
 - name: Unpack cork binaries
@@ -57,21 +98,32 @@
     src: "{{ download_dir.path }}/{{ cork_binaries_filename }}"
   when: installation_required
 
-- name: Copy cmgrd binary to install location
+- name: Copy corkd binary to install location
   ansible.builtin.copy:
-    src: "{{ download_dir.path }}/cmgrd"
-    dest: "{{ install_location }}/cmgrd"
+    src: "{{ download_dir.path }}/{{ cork_daemon_binary }}"
+    dest: "{{ install_location }}/{{ cork_daemon_binary }}"
     mode: "0755"
     remote_src: yes
-  when: installation_required
+  when: installation_required and (cork_daemon_enabled | bool)
 
-- name: Copy cmgrd-cli binary to install location
+- name: Copy cork CLI binary to install location
   ansible.builtin.copy:
-    src: "{{ download_dir.path }}/cmgrd-cli"
-    dest: "{{ install_location }}/cmgrd-cli"
+    src: "{{ download_dir.path }}/{{ cork_cli_binary }}"
+    dest: "{{ install_location }}/{{ cork_cli_binary }}"
     mode: "0755"
     remote_src: yes
-  when: installation_required
+  when: installation_required and (cork_daemon_enabled | bool)
+
+# Straight to the name the wrapper execs, never to the name an operator types:
+# there is then no window where cork-build is the bare binary with none of its
+# environment, and nothing depends on a later task to move it aside.
+- name: Copy cork-build binary to install location
+  ansible.builtin.copy:
+    src: "{{ download_dir.path }}/cork-build"
+    dest: "{{ cork_build_binary_path }}"
+    mode: "0755"
+    remote_src: yes
+  when: installation_required and (cork_builder_enabled | bool)
 
 - name: Remove temporary directory
   ansible.builtin.file:

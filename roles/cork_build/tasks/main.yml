@@ -1,0 +1,39 @@
+---
+# Everything the build plane needs from cork is what the cork role already
+# installs; what differs is which half of it runs. So this role is a profile
+# over that one rather than a second copy of it, and the vars below are passed
+# at include scope, which beats the cork role's own defaults.
+#
+# THE SAME TWO PRECEDENCE TRAPS AS docker_builder, both silent:
+#
+#   1. These are include params, not task vars: they beat role defaults,
+#      group_vars, host_vars, play vars, include_vars and set_fact. They still
+#      LOSE to --extra-vars and to role params. Invoking this role from a
+#      `roles:` list with bare keys on the entry makes those role params, and
+#      they defeat the profile wholesale while the play still reports green. Use
+#      include_role, or nest the keys under `vars:`.
+#   2. Override the profile through the cork_build_* variables, never through
+#      the cork-role names they feed. Setting cork_daemon_enabled in host_vars
+#      does nothing at all here.
+
+- name: Configure cork as this deployment's build plane
+  ansible.builtin.include_role:
+    name: picoctf.ansible_roles.cork
+  vars:
+    cork_daemon_enabled: "{{ cork_build_daemon_enabled }}"
+    cork_builder_enabled: "{{ cork_build_builder_enabled }}"
+    artifact_server_enabled: "{{ cork_build_artifact_server_enabled }}"
+    cork_deploy_docker_certs: "{{ cork_build_deploy_docker_certs }}"
+
+# The tree is a git checkout and its artifacts are LFS objects, so a plain git
+# clone that pulls no LFS content leaves every artifact a pointer file -- which
+# builds, and produces challenges whose downloads are 130-byte text files.
+- name: Ensure git and git-lfs are installed
+  ansible.builtin.apt:
+    name:
+      - git
+      - git-lfs
+    state: present
+    update_cache: yes
+  become: yes
+  when: cork_build_install_git | bool

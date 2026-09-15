@@ -10,6 +10,109 @@ you have to do.
 
 ---
 
+## cork splits into a build plane and an orchestrator, and its variables are renamed
+
+**Affects** `cork`, `docker` · **Action required: rewrite the play, and re-provision the
+orchestrator**
+
+cork now separates building from serving
+([issue #18](https://github.com/CyLabAcademy/challenge-orchestrator/issues/18)). One
+**build plane** holds the challenge tree, builds every image, pushes it to the shared
+registry and hands the finished builds to the orchestrators; each **orchestrator** serves
+what it is handed, on its own workers, and builds nothing. The new
+[`cork_build`](./roles/cork_build/README.md) role is the build plane's profile over
+`cork`, the way `docker_builder` is over `docker`.
+
+The binaries were renamed in the same release: `corkd` is the daemon, `cork` its CLI, and
+`cork-build` the build plane. The release tarball is now `cork_linux_<arch>.tar.gz` — the
+role picks the asset by `ansible_architecture`, so an arm64 orchestrator installs an arm64
+build — and it carries `cmgrd` and `cmgrd-cli` as symlinks for two more minor releases.
+This role installs the current names only, so `systemctl status cmgrd` becomes
+`systemctl status corkd`. Applying it also stops, disables and
+removes `cmgrd.service` where one exists, before enabling its own -- two units would
+mean two daemons on one port and one database -- so an orchestrator upgraded in place
+is briefly down. One consequence worth knowing before pinning: this role can only
+install a release that publishes the `cork_<os>_<arch>` asset, so `cork_version` cannot
+name anything older than the rename.
+
+### Every role variable gained a `cork_` prefix
+
+| Was | Is |
+| --- | --- |
+| `version`, `upgrade`, `clean_upgrade` | `cork_version`, `cork_upgrade`, `cork_clean_upgrade` |
+| `cmgr_registry`, `cmgr_db`, `cmgr_dir`, `cmgr_artifact_dir` | `cork_registry`, `cork_db`, `cork_dir`, `cork_artifact_dir` |
+| `cmgr_logging`, `cmgr_ports`, `cmgr_prune_age`, `cmgr_db_wal` | `cork_logging`, `cork_ports`, `cork_prune_age`, `cork_db_wal` |
+| `cmgr_registry_cert_dir`, `cmgr_base_pins`, `cmgr_purge_after_push` | `cork_registry_cert_dir`, `cork_base_pins`, `cork_purge_after_push` |
+| `cmgr_concurrent_launches`, `cmgr_enable_disk_quotas` | `cork_concurrent_launches`, `cork_enable_disk_quotas` |
+| `cmgr_extra_environment_vars` | `cork_extra_environment_vars` |
+| `artifact_server_service_enabled` | `artifact_server_enabled` (gates the install as well as the unit) |
+
+There is no fallback: an old name in a play is simply ignored, and the role falls back to
+its own default. `cork_registry` is the one that fails loudly — its default is a
+placeholder the role asserts against — so a play converted by halves stops rather than
+deploying a daemon pointed at the wrong registry.
+
+The **environment variables** in the unit file are renamed too, `CMGR_*` to `CORK_*`. Cork
+still reads the old names when the new ones are unset, but names each one it finds at
+startup, and they go away two minor releases after the rename. One old name stays
+deliberately: `CMGR_ARTIFACT_DIR` is what `cmgr-artifact-server` reads, so the build plane
+exports both spellings of that directory from one variable.
+
+### The role's default directories are three, not one
+
+The tree, the artifact bundles and the database used to share one directory
+(`/challenges`), which is what the cmgr role still does and what every real play
+overrides away from. They now default to `/cork/challenges`, `/cork/artifacts` and
+`/cork/cork.db`, because their lifetimes differ: the tree is a checkout, the bundles are
+output, and the database is the one thing that must not be lost -- an orchestrator
+records each build under the id the plane gave it. Sharing a directory also put the
+database and the bundles inside a git checkout on a build plane, and pointed
+`cork_clean_upgrade`'s `rm -rf` at the tree.
+
+A play that sets `cork_dir`, `cork_artifact_dir` and `cork_db` explicitly is unaffected.
+One relying on the defaults keeps its data at the old paths, which nothing moves.
+
+### An orchestrator no longer needs docker
+
+Set `cork_build_plane: external` and the daemon builds nothing: no docker daemon, no
+challenge tree, no artifact bundles, and no artifact server. Drop the `docker` role from
+that play, drop `cmgr_dir`/`cmgr_artifact_dir`, and put `cork_db` somewhere that is not the
+challenge directory. Certificates do not change — an orchestrator still holds both client
+sets, because it drives the workers over mTLS and untags in the registry itself.
+
+A one-box deployment is unaffected in shape: `cork_build_plane` defaults to `local`, which
+is the behaviour this role has always had.
+
+### `CORK_LOGGING` is live now, and the role has always set it to `warn`
+
+`cmgrd` documented that setting and ignored it, hardcoding INFO. `corkd` reads it. So a
+deployment that has been logging at INFO goes quiet on upgrade without anything in the
+play changing. Set `cork_logging: info` if that is what you were getting.
+
+### cmgr-artifact-server must be v3.0.0 or newer on a build plane
+
+A plane writes one subdirectory of the artifact directory per destination, and only v3
+treats those as namespaces. v2 ignores every subdirectory, so it publishes **nothing** for
+a namespaced plane and reports no error — an artifact directory with no builds in its root
+looks exactly like a host that has not built yet. The role asserts the floor where
+`cork_builder_enabled` is set.
+
+Note the trap in how it installs: `artifact_server_version: latest` only installs when the
+binary is **absent**, so a host that already has v2 needs one pass with
+`artifact_server_upgrade: yes` before the floor is satisfied.
+
+### Builders need a `bip`
+
+`docker_builder` now sets `docker_bip` (10.200.0.1/24), giving the default bridge its own
+address block instead of a /29 from `network_ip_pools`. BuildKit puts each `RUN` step's
+networking on the default bridge, so without it a parallel build fails with `no available
+IPv4 addresses on this network's address pools: bridge`. Applying this to an existing
+builder restarts dockerd. Hosts that do not build are unaffected: `docker_bip` defaults to
+null in the `docker` role and renders byte-identical to before.
+
+---
+
+
 ## The cork orchestrator moves to `docker_builder`
 
 **Affects** `docker`, `cork` · **Action required: change the play, expect a dockerd restart**

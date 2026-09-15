@@ -1,0 +1,19 @@
+# Managed by the cork ansible role. Edits here are overwritten on the next apply.
+#
+# CORK_DESTINATIONS: the name a schema's `destination:` names, mapped to the
+# orchestrator that serves it. cork-build resolves against this, so a mistyped
+# name is refused here rather than dialled, and moving an orchestrator is a
+# change to this file rather than to every schema bound to it.
+#
+# Each address is dialled from this host over the private network -- the
+# security group that admits the build plane admits it there, and the cork API
+# carries no authentication, so it must never cross the internet. Use internal
+# names.
+#
+# A schema naming no destination means the only one configured, and is refused
+# once there is more than one. Two names for one address are refused when the
+# file is read: one orchestrator is one destination, and a second name for it
+# would make every schema there look as though two were serving it.
+{% for name in cork_destinations | sort %}
+{{ name }}: "{{ cork_destinations[name] }}"
+{% endfor %}

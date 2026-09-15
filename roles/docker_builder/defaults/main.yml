@@ -143,3 +143,33 @@ docker_builder_gc_policy:
   - reservedSpace: "2GB"
     maxUsedSpace: "25GB"
     minFreeSpace: "10GB"
+
+# The default bridge's own address block, which a builder needs and a worker
+# does not.
+#
+# The docker role leaves this unset, so docker0 is carved out of
+# network_ip_pools like any other network -- a /29 in this fleet, which is the
+# right size for a challenge instance and the wrong one here. BuildKit puts each
+# RUN step's networking on the DEFAULT bridge, so a parallel build runs out of
+# addresses and fails with
+#
+#   no available IPv4 addresses on this network's address pools: bridge
+#
+# Reproduced on a 4-CPU host building four challenges at once; it is a function
+# of build parallelism, not of corpus size, so a bigger builder meets it sooner.
+#
+# 10.200.0.1/24, which overlaps nothing this fleet or its neighbours use: not
+# network_ip_pools (192.168.0.0/16 here, and 172.16.0.0/12 on the course boxes,
+# which exclude 192.168/16 because it collides with their VM network), not the
+# AWS default VPC (172.31.0.0/16), and not docker's own 172.17.0.0/16 -- which is
+# the obvious choice and the wrong one, for exactly that last reason.
+#
+# Overlapping a pool is not fatal -- measured on Docker 29.8, the allocator skips
+# the bridge's subnet and simply has that much less to hand out, and dockerd
+# starts either way. It is just waste, until the pools run out: a bip that
+# swallows a whole pool consumes it, and with the last one gone every
+# `docker network create` answers "all predefined address pools have been fully
+# subnetted", which on a host that launches challenges is every launch failing
+# while the daemon reports itself healthy. A value outside every pool costs
+# nothing and cannot get there.
+docker_builder_bip: "10.200.0.1/24"

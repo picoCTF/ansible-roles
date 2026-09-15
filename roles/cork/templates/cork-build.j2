@@ -1,0 +1,43 @@
+#!/bin/bash
+# Managed by the cork ansible role. Edits here are overwritten on the next apply.
+#
+# cork-build is a command rather than a daemon, so its settings cannot live in a
+# unit file the way corkd's do. They live here, in the wrapper that owns the name
+# on PATH; the binary itself is {{ cork_build_binary_path }}, which nothing types.
+# The cmgr role wrapped its CLI the same way and for the same reason.
+set -e -o pipefail
+
+export CORK_DIR="{{ cork_dir }}"
+export CORK_DB="{{ cork_db }}"
+export CORK_ARTIFACT_DIR="{{ cork_artifact_dir }}"
+{#
+  Both names, deliberately. cork reads CORK_ARTIFACT_DIR; cmgr-artifact-server,
+  which publishes what this writes, looks up CMGR_ARTIFACT_DIR and always will
+  -- it is the one pre-rename name with a second reader. They must name the same
+  directory, so they are rendered from the same variable.
+#}
+export CMGR_ARTIFACT_DIR="{{ cork_artifact_dir }}"
+export CORK_LOGGING="{{ cork_logging }}"
+{% if cork_registry %}
+export CORK_REGISTRY="{{ cork_registry }}"
+{% endif %}
+{% if cork_registry_cert_dir %}
+export CORK_REGISTRY_CERT_DIR="{{ cork_registry_cert_dir }}"
+{% endif %}
+{% if cork_base_pins %}
+export CORK_BASE_PINS="{{ cork_base_pins }}"
+{% endif %}
+{% if cork_purge_after_push is not none %}
+export CORK_PURGE_AFTER_PUSH="{{ cork_purge_after_push | bool | ternary('on', 'off') }}"
+{% endif %}
+{% if cork_db_wal is not none %}
+export CORK_DB_WAL="{{ cork_db_wal | bool | ternary('on', 'off') }}"
+{% endif %}
+export CORK_DESTINATIONS="{{ cork_destinations_path }}"
+{% for key, value in cork_extra_environment_vars.items() %}
+export {{ key }}="{{ value }}"
+{% endfor %}
+
+# exec, so signals and the exit status belong to cork-build itself: a deploy
+# interrupted halfway is a thing an operator has to be able to do.
+exec "{{ cork_build_binary_path }}" "$@"

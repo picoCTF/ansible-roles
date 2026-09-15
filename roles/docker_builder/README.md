@@ -1,7 +1,8 @@
 # docker_builder
 
 Configures the Docker host that **builds** cork's challenge images — the
-cork orchestrator, and nothing else. Workers use `multihost_docker`.
+build plane, and nothing else. An orchestrator on an external build plane runs no
+docker daemon at all, and workers use `multihost_docker`.
 
 This is a thin profile over the `docker` role rather than a third copy of it: it
 includes that role with a handful of settings changed, so installation, storage,
@@ -11,9 +12,9 @@ none.
 
 ## Why the builder is not a worker
 
-The orchestrator inherited the plain `docker` role, whose defaults are shaped for
+The build plane inherited the plain `docker` role, whose defaults are shaped for
 a host that runs untrusted challenge containers. Three of those defaults are
-wrong here, and one thing it never had is now needed.
+wrong here, and two things it never had are now needed.
 
 Override these through the `docker_builder_*` variables in `defaults/main.yml`,
 never through the docker-role names in the left column: the profile passes those
@@ -27,6 +28,7 @@ vars. See "Two precedence traps" below.
 | `userns_remap_enabled` | yes | **no** | Shifts ownership of the data-root and every build's filesystem for no gain, on a volume shared with the challenge checkout, database and artifacts. |
 | `tls_access` | yes | **no** | `cmgrd` reaches this daemon over the local unix socket. There is no remote client to authenticate. Note `multihost_docker` has no such variable — it configures certificates unconditionally — so this row has no worker counterpart. |
 | `builder_gc_enabled` | no | **yes** | The new part. See below. Override with `docker_builder_gc_enabled`. |
+| `docker_bip` | unset | **10.200.0.1/24** | The other new part. Without it docker0 is carved out of `network_ip_pools` at /29, and BuildKit — which puts every `RUN` step on the default bridge — runs out of addresses mid-build. Override with `docker_builder_bip`. |
 
 ### docker-reaper
 

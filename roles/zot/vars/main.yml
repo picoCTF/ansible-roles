@@ -1,7 +1,14 @@
 ---
 zot_install_path: "/usr/bin/zot"
 zot_config_dir: "/etc/zot"
-zot_binary_filename: "zot-linux-amd64"
+# The upstream release asset, by architecture. zot publishes a static binary per
+# platform, and the marker below is keyed on the download URL -- so switching a host
+# between architectures changes the URL and reinstalls, which is exactly right.
+zot_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+zot_arch: "{{ zot_arch_map[ansible_facts['architecture']] | default('') }}"
+zot_binary_filename: "zot-linux-{{ zot_arch }}"
 zot_download_url: "https://github.com/project-zot/zot/releases/download/{{ zot_version }}/{{ zot_binary_filename }}"
 
 # Records the URL the installed binary came from. zot has no version flag (its CLI is

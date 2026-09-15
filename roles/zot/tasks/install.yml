@@ -7,6 +7,15 @@
 # compare timestamps against the existing binary) is what makes a zot_version change
 # take effect in either direction.
 
+- name: Assert this architecture has a zot release
+  ansible.builtin.assert:
+    that:
+      - zot_arch | length > 0
+    fail_msg: >-
+      zot publishes a release per architecture and this role knows none for
+      '{{ ansible_facts['architecture'] | default('unknown -- this play gathered no facts') }}'
+      (known: {{ zot_arch_map.keys() | join(', ') }}).
+
 - name: Ensure zot config directory exists
   ansible.builtin.file:
     path: "{{ zot_config_dir }}"

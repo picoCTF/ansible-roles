@@ -1,72 +1,148 @@
 ---
-version: "latest"
-upgrade: no
-clean_upgrade: no
+# Which half of the deployment this host is.
+#
+# cork splits into a build plane and the orchestrators it feeds (issue #18).
+# This role installs either; the cork_build role is the profile that turns it
+# into the former. The defaults here describe an orchestrator that also builds,
+# which is the one-box deployment and what this role has always done.
+#
+# cork_build_plane is CORK_BUILD_PLANE: 'local' builds on this host's docker
+# daemon from the tree in cork_dir, 'external' builds nothing and takes finished
+# builds from a build plane over PUT /challenges/<id>. An external daemon needs
+# no docker daemon, no challenge tree and no artifact directory, and says so at
+# startup about any it is given.
+cork_build_plane: "local"
+# Whether corkd runs here. Off on a build plane, which serves nothing.
+cork_daemon_enabled: yes
+# Whether cork-build is installed, with the wrapper carrying its environment.
+# On only on the build plane.
+cork_builder_enabled: no
+
+cork_version: "latest"
+cork_upgrade: no
+cork_clean_upgrade: no
 cork_github_url: "https://github.com/CyLabAcademy/challenge-orchestrator"
 
+# Certificates. cork holds the CN=cmgr identity in two trust domains and needs
+# whichever ones its host actually acts in: the docker-ca set to drive the
+# worker daemons (orchestrator only), and the zot-ca set to reach the registry
+# (both -- a build plane pushes, an orchestrator checks tags and untags).
 cork_deploy_certs: yes
+cork_deploy_docker_certs: "{{ cork_daemon_enabled }}"
+# Only where there is a registry to reach. A one-box deployment leaves cork_registry
+# unset and needs no registry client material at all.
+cork_deploy_registry_certs: "{{ cork_registry | default('', true) | length > 0 }}"
 cork_cert_src: "./docker-certs"
 docker_cert_path: "/root/.docker_certs"
-cmgr_registry: "REPLACE_ME:5000"
 
-cmgr_db: "{{ challenge_dir }}/cmgr.db"
-cmgr_dir: "{{ challenge_dir }}"
-cmgr_artifact_dir: "{{ challenge_dir }}"
-cmgr_logging: "warn"
-cmgr_registry_cert_dir: null
+# CORK_REGISTRY, which is also the certs.d directory name and the registry
+# challenge images are tagged with. The build plane pushes here and the workers
+# pull from here, so every host in a deployment must agree on this string.
+cork_registry: "REPLACE_ME:5000"
 
-# Drop the builder's local copy of each image once it is pushed (CMGR_PURGE_AFTER_PUSH).
+cork_db: "{{ cork_root }}/cork.db"
+cork_dir: "{{ challenge_dir }}"
+cork_artifact_dir: "{{ artifact_dir }}"
+# CORK_LOGGING: debug, info, warn, error or disabled. corkd has no flag for it,
+# so this is the only way to raise an orchestrator's logging. Note that cork
+# only began reading it with the build plane split: a deployment upgrading from
+# before that has been logging at INFO regardless of this value, and will go
+# quiet when it lands.
+cork_logging: "warn"
+cork_registry_cert_dir: null
+
+# Drop the builder's local copy of each image once it is pushed
+# (CORK_PURGE_AFTER_PUSH).
 #
-# On, and the build host's disk sizing assumes it. This is what makes docker_builder's
-# BuildKit GC policy able to do anything at all: BuildKit may only evict cache records
-# nothing references, and every record backing an image still on the builder IS
-# referenced. Leave the images in place and the cache is permanently unreclaimable, so
-# no value of maxUsedSpace or minFreeSpace bounds the volume -- it fills regardless of
-# the policy and the GC never runs at all. Measured over a full corpus build on one
-# host: with this off the disk was exhausted partway through a single schema; with it
-# on the same schema finished with room to spare, same policy, same volume.
+# On, and the build host's disk sizing assumes it. This is what makes
+# docker_builder's BuildKit GC policy able to do anything at all: BuildKit may
+# only evict cache records nothing references, and every record backing an image
+# still on the builder IS referenced. Leave the images in place and the cache is
+# permanently unreclaimable, so no value of maxUsedSpace or minFreeSpace bounds
+# the volume -- it fills regardless of the policy and the GC never runs at all.
+# Measured over a full corpus build on one host: with this off the disk was
+# exhausted partway through a single schema; with it on the same schema finished
+# with room to spare, same policy, same volume.
 #
-# Ignored without a registry: there is nowhere to push, the builder's copy is then the
-# only one, and removing it would break every launch. cmgrd gates that itself.
+# Ignored without a registry: there is nowhere to push, this host's copy is then
+# the only one, and removing it would break every launch. cork gates that
+# itself, and an external daemon ignores it entirely.
 #
-# One reason to turn it off: a small, deliberate build set where keeping the images
-# locally is the point -- inspecting what was produced, or skipping a pull on relaunch
-# -- accepting an unbounded image store for the duration. Not something to leave off.
-cmgr_purge_after_push: yes
-cmgr_ports: null
-cmgr_concurrent_launches: null
-# Must be <= the container sweep in multihost_docker (docker_reaper_command --min-age,
-# currently 30m). docker-reaper force-removes the container while this only expires cmgr's
-# database row, so a longer prune age leaves cmgrd reporting an instance whose container is
-# already gone -- the player gets connection-refused and nothing is logged. The two values
-# live in different roles and nothing checks them against each other.
-cmgr_prune_age: 30m
-cmgr_db_wal: null
-cmgr_enable_disk_quotas: null
-# Where cmgrd keeps its base image digest pins (CMGR_BASE_PINS).
+# One reason to turn it off: a small, deliberate build set where keeping the
+# images locally is the point -- inspecting what was produced, or skipping a
+# pull on relaunch -- accepting an unbounded image store for the duration. Not
+# something to leave off.
+cork_purge_after_push: yes
+cork_ports: null
+cork_concurrent_launches: null
+# Must be <= the container sweep in multihost_docker (docker_reaper_command
+# --min-age, currently 30m). docker-reaper force-removes the container while this
+# only expires cork's database row, so a longer prune age leaves corkd reporting
+# an instance whose container is already gone -- the player gets
+# connection-refused and nothing is logged. The two values live in different
+# roles and nothing checks them against each other.
+cork_prune_age: 30m
+# CORK_DB_WAL, and null is the right default rather than an oversight: cork's own
+# default is WAL ON, so leaving the variable out of the unit is what keeps it on.
+# This is only the knob for turning it off.
+#
+# Rendered as on/off rather than as the value itself, because cork's check is a
+# case-sensitive comparison against "false", "0" and "off" -- and YAML's `false`
+# reaches a template as Python's False, which Jinja renders "False". Written
+# literally, the one value anyone would ever set here would leave WAL on and say
+# nothing about it.
+cork_db_wal: null
+cork_enable_disk_quotas: null
+# Where the build path keeps its base image digest pins (CORK_BASE_PINS).
 #
 # The corpus root, deliberately, so the file is COMMITTED to the challenge
-# repository and versioned with the Dockerfiles it pins. cmgrd's own default is
-# <CMGR_DIR>/.base-pins.json -- a dotfile, which nobody commits and a
+# repository and versioned with the Dockerfiles it pins. cork's own default is
+# <CORK_DIR>/base-pins.json -- which is the same place, but naming it here keeps
+# it explicit. What it must not be is a dotfile nobody commits and a
 # `git clean -xdf` erases, leaving the pins as untracked state on one machine.
 # That matters because losing them is not a no-op: an empty pin map fingerprints
 # differently, so every challenge's next rebuild produces a differently tagged
 # image.
 #
 # Committed instead, a base bump is a reviewable diff, a fresh clone restores it,
-# and a rebuilt orchestrator comes back pinned. It sits outside every challenge
+# and a rebuilt build plane comes back pinned. It sits outside every challenge
 # directory, so it perturbs no source checksum, and cork's own scan ignores it.
 #
-# Nothing creates the file; `cmgrd-cli pin-refresh` writes it (dirtying the
+# Nothing creates the file; `cork-build pin-refresh` writes it (dirtying the
 # checkout -- commit the result), and an absent one simply means no pinning. Set
-# to null to leave CMGR_BASE_PINS unset and take cmgrd's default.
-cmgr_base_pins: "{{ cmgr_dir }}/base-pins.json"
-cmgr_extra_environment_vars: {}
+# to null to leave CORK_BASE_PINS unset and take cork's default. Inert on an
+# external daemon, which builds nothing and answers 409 to the pin endpoints.
+cork_base_pins: "{{ cork_dir }}/base-pins.json"
+cork_extra_environment_vars: {}
+
+# Build plane only. The yaml mapping destination names to the orchestrators they
+# stand for, which is what a schema's `destination:` resolves against:
+#
+#   cork_destinations:
+#     c_library: "http://autarch.example.internal:4200"
+#
+# Reach each orchestrator by its INTERNAL name. The address is dialled from this
+# host, and a security group that admits the build plane admits it on the
+# private network -- traffic sent to a public name leaves and returns with this
+# host's public address, matching nothing. The cork API also has no
+# authentication, which is only tolerable because it never crosses the internet.
+cork_destinations: {}
+cork_destinations_path: "/etc/cork/destinations.yml"
 
 artifact_server_version: "latest"
 artifact_server_upgrade: no
-artifact_server_service_enabled: yes
+# Whether cmgr-artifact-server is installed and run here. It publishes what a
+# build plane writes, so it belongs beside one: an orchestrator on an external
+# build plane holds no bundles at all and gets neither the binary nor the unit.
+artifact_server_enabled: "{{ cork_build_plane != 'external' }}"
 artifact_server_backend: "selfhosted"
 artifact_server_other_options: ""
 artifact_server_extra_environment_vars: {}
 artifact_server_github_url: "https://github.com/picoCTF/cmgr-artifact-server"
+# v3.0.0 is a floor, not a preference. A build plane writes one subdirectory per
+# destination, and only v3 treats those as namespaces (it looks for the
+# .cork-artifact-namespace marker cork-build leaves in each). v2 ignores every
+# subdirectory, so it would publish NOTHING for a namespaced plane -- silently,
+# since an artifact directory with no builds in its root looks exactly like a
+# host that has not built yet.
+artifact_server_min_version: "3.0.0"
