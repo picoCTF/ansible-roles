@@ -1,0 +1,33 @@
+---
+# The build plane profile. Each of these is fed to the cork role by
+# tasks/main.yml, so overriding one here (or in the play) changes what that role
+# is given.
+
+# corkd serves instances on an orchestrator. Nothing runs here: every schema is
+# converged on this host with its builds on demand, which launches nothing, and
+# the count a schema really asks for travels in the hand-over for the
+# orchestrator to converge to. So there is no daemon and no unit.
+cork_build_daemon_enabled: no
+
+# cork-build, and the wrapper that carries its environment. The whole point of
+# this host.
+cork_build_builder_enabled: yes
+
+# The artifact server belongs beside the plane that writes the bundles: cork
+# serves no artifacts at all, and an orchestrator on an external build plane
+# holds none. Note the version floor the cork role asserts -- a build plane
+# needs cmgr-artifact-server 3.0.0 or newer, since older versions ignore the
+# per-destination subdirectories entirely and publish nothing.
+cork_build_artifact_server_enabled: yes
+
+# The docker-ca client set authenticates cork to the worker dockerds. This host
+# drives no workers -- it hands builds to an orchestrator, which does -- so it
+# gets the zot set only. Its own docker daemon is reached over the unix socket
+# and needs no certificate.
+cork_build_deploy_docker_certs: no
+
+# git and git-lfs, because the challenge tree here is a checkout and its
+# artifacts are LFS objects. This role does not clone anything: the repository
+# is private, the credentials are not ansible's to hold, and which revision is
+# deployed is a deploy decision rather than a provisioning one.
+cork_build_install_git: yes

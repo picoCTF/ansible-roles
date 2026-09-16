@@ -4,7 +4,7 @@
 
 - name: Ensure artifact directory exists and is root-only
   ansible.builtin.file:
-    path: "{{ cmgr_artifact_dir }}"
+    path: "{{ cork_artifact_dir }}"
     state: directory
     mode: "0770"
 
@@ -14,6 +14,7 @@
     dest: "{{ systemd_unit_dir }}/cmgr_artifact_server.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: cmgr_artifact_server_unit
   notify:
     - Reload systemd config

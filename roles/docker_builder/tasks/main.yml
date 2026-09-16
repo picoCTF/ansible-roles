@@ -34,3 +34,4 @@
     docker_reaper_enabled: "{{ docker_builder_reaper_enabled }}"
     builder_gc_enabled: "{{ docker_builder_gc_enabled }}"
     builder_gc_policy: "{{ docker_builder_gc_policy }}"
+    docker_bip: "{{ docker_builder_bip }}"

@@ -1,0 +1,54 @@
+---
+
+# The build plane's half of the role.
+#
+# cork-build is a command an operator runs, not a daemon, so what it needs is an
+# environment and a routing table rather than a systemd unit. Both live in files
+# this role owns: the wrapper that carries the settings, and the destinations
+# yaml that says which orchestrator each schema name resolves to.
+
+- name: Ensure challenge directory exists and is root-only
+  ansible.builtin.file:
+    path: "{{ cork_dir }}"
+    state: directory
+    mode: "0770"
+
+- name: Ensure the database directory exists
+  ansible.builtin.file:
+    path: "{{ cork_db | dirname }}"
+    state: directory
+    mode: "0770"
+
+# The bundles this plane writes, one subdirectory per destination. The artifact
+# server creates this too, but only where it runs: a plane publishing by some
+# other means still writes here.
+- name: Ensure artifact directory exists and is root-only
+  ansible.builtin.file:
+    path: "{{ cork_artifact_dir }}"
+    state: directory
+    mode: "0770"
+
+- name: Ensure cork configuration directory exists
+  ansible.builtin.file:
+    path: "{{ cork_destinations_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+# Written even when empty. A build plane with no destinations configured is a
+# plane every schema has to be routed by --server, and an absent file is not an
+# error to cork-build -- but a present, empty one says which of the two it is.
+- name: Ensure the destinations file exists
+  ansible.builtin.template:
+    src: "destinations.yml.j2"
+    dest: "{{ cork_destinations_path }}"
+    lstrip_blocks: yes
+    force: yes
+    mode: "0644"
+
+- name: Ensure the cork-build wrapper exists
+  ansible.builtin.template:
+    src: "cork-build.j2"
+    dest: "{{ cork_build_wrapper_path }}"
+    lstrip_blocks: yes
+    force: yes
+    mode: "0755"

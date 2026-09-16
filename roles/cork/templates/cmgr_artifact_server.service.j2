@@ -1,12 +1,17 @@
 [Unit]
 Description=cmgr artifact server
 Documentation=https://github.com/picoCTF/cmgr-artifact-server
-ConditionArchitecture=x86-64
-ConditionPathIsDirectory={{ cmgr_artifact_dir }}
+ConditionArchitecture={{ cork_condition_architecture }}
+ConditionPathIsDirectory={{ cork_artifact_dir }}
 
 [Service]
 Type=exec
-Environment="CMGR_ARTIFACT_DIR={{ cmgr_artifact_dir }}"
+{#
+  CMGR_ARTIFACT_DIR, not CORK_ARTIFACT_DIR: this is a different program and
+  reads the name it always has. It watches the same directory cork-build writes
+  to, so both are rendered from cork_artifact_dir.
+#}
+Environment="CMGR_ARTIFACT_DIR={{ cork_artifact_dir }}"
 {% for key, value in artifact_server_extra_environment_vars.items() %}
 Environment="{{ key }}={{ value }}"
 {% endfor %}

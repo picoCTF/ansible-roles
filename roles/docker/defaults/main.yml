@@ -167,3 +167,36 @@ container_slice_tasks_max_pct: 50
 # belongs above the hard floor, not below it.
 system_slice_memory_min_mb: 256
 user_slice_memory_min_mb: 64
+
+# Address of the default bridge (docker0), written as daemon.json's "bip".
+#
+# This is not the same question as network_prefix_length, and the two are easy to
+# conflate. That one sizes the network a challenge instance gets -- five
+# containers per instance at /29, which is a deliberate capacity decision. This
+# one sizes the DEFAULT bridge, which on a worker nothing attaches to at all:
+# cork puts every instance on a network of its own. So null is right there, and
+# docker0 quietly takes a /29 out of the pool that nothing uses.
+#
+# A host that BUILDS is the exception, and only while it builds. BuildKit puts
+# each RUN step's networking on the default bridge, so the size of docker0 bounds
+# how many build steps can run at once -- five at /29, and the sixth dies with
+#
+#   no available IPv4 addresses on this network's address pools: bridge
+#
+# which reads as a docker bug rather than as an address pool being the size the
+# operator asked for. docker_builder sets this; see that role for the value and
+# why it is the one it is.
+#
+# What an overlap with network_ip_pools costs, measured on Docker 29.8 rather
+# than assumed: dockerd starts either way -- this is never a startup error -- and
+# the allocator SKIPS the bridge's subnet, so a bip inside a larger pool simply
+# removes that much address space (bip 172.17.0.1/24 in a 172.17.0.0/16 pool at
+# /29: user networks begin at 172.17.1.0/29, not at the bridge). The cost only
+# becomes a failure when the pools run out: a bip that swallows a whole pool
+# consumes it, and once the last one is gone `docker network create` answers
+# "all predefined address pools have been fully subnetted" -- which on a
+# challenge server is every launch failing while the daemon reports itself fine.
+#
+# Overlapping the VPC's own CIDR is the separate and worse mistake: containers
+# then have a route to a range real hosts live in.
+docker_bip: null

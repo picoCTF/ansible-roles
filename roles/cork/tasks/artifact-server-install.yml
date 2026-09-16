@@ -1,16 +1,22 @@
 ---
 
-# Install cmgr-artifact-server
+# Install cmgr-artifact-server, which publishes the artifact bundles a build
+# plane writes. Its name is not part of the cork rename: it is a separate
+# program and keeps its own.
 
 - name: Check whether cmgr-artifact-server is installed
   ansible.builtin.stat:
     path: "{{ install_location }}/cmgr-artifact-server"
   register: artifact_server_binary
 
+# Probed whenever it is present, not only when upgrading: the version floor
+# below has to be checked against what this host will actually run, and a host
+# that installs nothing this pass still runs whatever is already there.
 - name: Determine installed cmgr-artifact-server version
   ansible.builtin.shell:
     cmd: echo "v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
-  when: (artifact_server_upgrade | bool) and artifact_server_binary.stat.exists
+  when: artifact_server_binary.stat.exists
+  changed_when: false
   register: artifact_server_version_output
 
 - name: Determine latest cmgr-artifact-server version
@@ -23,7 +29,35 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and artifact_server_version_output.stdout != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and artifact_server_version_output.stdout != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
+    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and (artifact_server_version_output.stdout | default('') | trim) != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and (artifact_server_version_output.stdout | default('') | trim) != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
+
+- name: Determine which cmgr-artifact-server version this host will run
+  ansible.builtin.set_fact:
+    artifact_server_target_version: "{{ ((artifact_server_latest_version_response.url.split('/tag/')[1] if artifact_server_version == 'latest' else artifact_server_version) if (artifact_server_installation_required | bool) else (artifact_server_version_output.stdout | default('') | trim)) | regex_replace('^v', '') }}"
+
+# A build plane writes one subdirectory of the artifact directory per
+# destination, and only v3 treats those as namespaces -- it looks for the
+# .cork-artifact-namespace marker cork-build leaves in each. v2 ignores every
+# subdirectory, so on a plane it publishes nothing at all, and nothing says so:
+# an artifact directory with no builds in its ROOT looks exactly like a host
+# that has not built yet.
+#
+# Asserted only where this host is a build plane. A one-box deployment writes
+# its bundles into the artifact directory itself, has no namespaces, and is
+# served correctly by older versions.
+- name: Assert cmgr-artifact-server is new enough to publish a build plane's namespaces
+  ansible.builtin.assert:
+    that:
+      - artifact_server_target_version | length > 0
+      - artifact_server_target_version is version(artifact_server_min_version, ">=")
+    fail_msg: >-
+      cmgr-artifact-server {{ artifact_server_target_version | default('(unknown)') }} is
+      below {{ artifact_server_min_version }}, which is the first release that publishes a
+      build plane's per-destination subdirectories. Below it this host would publish
+      nothing for every namespaced build and report no error. Note that
+      artifact_server_version='latest' only installs when the binary is ABSENT, so an
+      already-provisioned host needs one pass with artifact_server_upgrade=yes.
+  when: cork_builder_enabled | bool
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:
