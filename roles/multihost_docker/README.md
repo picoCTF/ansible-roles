@@ -424,7 +424,26 @@ is not enabled), so this belongs in the same drain window as applying the role.
 | Name | Description | Default |
 | --- | --- | --- |
 | `storage_quotas` | Whether to enable storage quotas by storing daemon state on an XFS filesystem. | `true` |
-| `storage_device` | The block device to format and mount as XFS. | `/dev/nvme1n1` |
+| `storage_device` | The block device to format as XFS. fstab mounts by `storage_label` rather than by this, but it is still required on every run: it formats a new volume, it is what the label is read from to decide whether a relabel is needed, and it is what the grow task resizes. **A stale or renumbered value is not detected** — if it names a different disk than the one mounted at `storage_mount_point`, the label can be written to the wrong volume. See [Baking a worker image](#baking-a-worker-image) for the two commands that check it. | `/dev/nvme1n1` |
+| `storage_mount_options` | fstab options for the volume — a whole-value override, not a list to append to, and nothing validates it. Keep all three: `pquota` is the point of the volume, `nofail` keeps an unresolvable label from failing `local-fs.target` and taking the boot with it, and the device timeout bounds the wait before it gives up. Dropping `pquota` is silent; dropping `nofail` surfaces only at the next reboot. | `pquota,nofail,x-systemd.device-timeout=30s` |
+| `storage_label` | Filesystem label of that volume, and what fstab mounts. A label is part of the filesystem, so it survives a snapshot where a device path does not — see [Baking a worker image](#baking-a-worker-image). | `docker-data` |
+
+`docker.service` gets a `RequiresMountsFor` drop-in for the mount. Without it, a
+volume that fails to mount leaves dockerd running on a directory of the same
+name on the root volume — a fraction of the space, no project quotas, and no
+error anywhere. The dependency turns that into a clean refusal to start.
+
+The fstab entry carries `nofail`, which is what keeps that refusal proportionate:
+without it an unresolvable label fails `local-fs.target` and the instance boots
+into emergency mode instead, where sshd never starts and there is no way in to
+find out why.
+
+Turning `storage_quotas` off on a host that had it on is a one-way door in one
+direction only: the drop-in and `data-root` are removed and dockerd goes back to
+`/var/lib/docker`, but the fstab entry and the mount are left alone — the role
+skips its storage tasks entirely when quotas are off, so it never sees them. The
+volume stays mounted and populated while nothing uses it. Unmount and remove the
+fstab line by hand if you actually want it gone.
 
 ### Docker network settings
 
@@ -468,3 +487,150 @@ is not enabled), so this belongs in the same drain window as applying the role.
 | `docker_reaper_shims_command` | Orphaned containerd shim sweep, run as a third `ExecStart` after the image sweep. Signals processes as root, so it is worth understanding before enabling: a shim is only signalled once its container is absent from the daemon's full container list. Requires docker-reaper ≥ `docker_reaper_shims_min_version`; omitted with a warning on older binaries. Empty string disables. | `shims --min-age 5m` |
 | `docker_reaper_shims_min_version` | Lowest docker-reaper version providing the `shims` subcommand. Below this the third `ExecStart` is omitted, because an unknown subcommand would fail the unit on every timer tick. | `1.3.0` |
 | `docker_reaper_interval_secs` | How frequently (in seconds) to run `docker-reaper`. | `60` |
+
+## Baking a worker image
+
+An autoscaled worker cannot be provisioned by this role: it has to boot ready,
+which means an image taken from a host this role has already finished with. The
+fleet's dockerd certificates are issued for one shared name
+(`SAN DNS:academy-docker-worker`) precisely so that workers can be cloned
+without reprovisioning, and nothing else in this role writes a per-host
+identity.
+
+Two things do carry identity, and both must be dealt with before imaging.
+
+**The data volume.** `CreateImage` snapshots every attached volume, so an image
+taken from a provisioned worker already carries a formatted, labelled, `pquota`
+XFS volume — with the challenge image cache warm, which is worth having. What
+does *not* survive is the device path: AWS builds
+`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol<id>` from the volume ID,
+and a snapshot restore produces a new volume with a new ID. That is why fstab
+names `LABEL=`. A worker provisioned before this role wrote labels is
+relabelled in place on the next run; nothing is reformatted and no data moves.
+
+This role is applied to the **base** worker, never to a clone. A clone is an AMI
+launch, and changing one means updating the base and re-imaging rather than
+running Ansible against a running replica — which is why `storage_device` may
+still name a volume-ID path even though nothing mounts by it: the base keeps its
+volume, and only the image copies move.
+
+**Docker's own state.** The volume being snapshotted *is* dockerd's data-root, so
+it carries more than the image cache: containers and their logs, libnetwork's
+IPAM database, and the daemon's `engine-id`. A clone taken from a live fleet
+member boots restoring another worker's containers and networks — cork tears down
+instances it has no record of, so every clone pays that inside its ready window,
+and anything not labelled `cmgr.dynamic=true` is outside the reaper's filter and
+stays for good. Quiesce first, which also means the snapshot is taken of a
+filesystem nothing is writing to:
+
+```sh
+ROOT=$(docker info --format '{{.DockerRootDir}}')   # NOT storage_mount_point, see below
+: "${ROOT:?docker info failed - do this before stopping the daemon}"
+docker ps -aq | xargs -r docker rm -fv              # -v, or their anonymous volumes stay
+docker volume prune -af                             # -a, or named volumes stay
+docker network prune -f
+sudo systemctl stop docker docker.socket
+sudo rm -f "$ROOT/engine-id"                        # else every clone reports one daemon ID
+sudo rm -f "$ROOT/network/files/local-kv.db"        # libnetwork's IPAM allocations
+```
+
+Take the root from `docker info` rather than assuming `/mnt/docker-data`: with
+`userns_remap_enabled` on — the default for a worker — dockerd appends the
+remapped `<uid>.<gid>` to it, so the files live a directory deeper. `rm -f` on a
+path that does not exist exits 0 silently, so guessing wrong here looks exactly
+like success.
+
+`docker rm` leaves anonymous volumes behind without `-v`, and `docker network
+prune` only removes unused *networks* — the IPAM database and the daemon ID are
+files, and both have to go after the daemon stops or it rewrites them on the way
+out. Docker regenerates each on next start.
+
+**Everything the OS assigns per host.** Scrub before imaging:
+
+```sh
+sudo rm -f /etc/ssh/ssh_host_*          # else every clone shares one host key
+sudo truncate -s 0 /etc/machine-id      # truncate, do not delete
+sudo hostnamectl set-hostname localhost # the os role set this one
+sudo cloud-init clean --logs            # required, and must come last
+```
+
+`cloud-init clean` is not optional and the order matters. It is what removes
+`data/previous-hostname` and `data/set-hostname` under the cloud dir, which is
+what makes `cc_set_hostname` treat the clone as changed and name it from the
+datasource on first boot. Skip it, or run it before the `hostnamectl` line, and
+every clone comes up called `localhost` — a state the validation below is written
+to catch, because "differs from the source" would not.
+
+**What the image carries.** The TLS material under `tls_cert_path` and
+`/etc/docker/certs.d/` is deliberately *not* scrubbed — provisioning it on first
+boot is the work an image exists to skip. An image therefore carries private key
+material, and should be handled accordingly: keep it and its snapshots private,
+and treat re-issuing the certificates as a re-bake of the base rather than
+something that can be done on a running replica.
+
+Then validate one instance launched from the image, outside any scaling group:
+
+```sh
+# the fstab line must name the label AND carry nofail; nothing else can check
+# nofail, because libmount never passes it to the kernel
+grep -E '^LABEL=docker-data\s+/mnt/docker-data\s+xfs\s+\S*\bnofail\b' /etc/fstab
+
+findmnt -no SOURCE,FSTYPE,OPTIONS /mnt/docker-data   # device, xfs, prjquota
+sudo blkid -c /dev/null -o device -t LABEL=docker-data  # exactly one device, and
+findmnt -no SOURCE /mnt/docker-data                     # it must be this one
+systemctl show docker.service -p RequiresMountsFor   # /mnt/docker-data
+docker info --format '{{.DockerRootDir}}'            # under /mnt/docker-data
+docker images                                        # cache came over in the snapshot
+
+# a machine-id that is 32 hex characters, not merely different from the source
+[ "$(cat /etc/machine-id | tr -d -c '[:xdigit:]' | wc -c)" = 32 ] && echo ok
+hostname                                             # not localhost, not the source's
+
+curl -s localhost:2136/health                        # {"overloaded":false}
+```
+
+Several of those replace checks that could not fail, and the reasons are worth
+knowing because the same traps recur:
+
+- `findmnt` prints the resolved device and never `LABEL=`, so only the fstab
+  line shows how the volume got mounted. And `nofail` is a libmount userspace
+  option that never reaches the kernel, so it can never appear in `findmnt`
+  output — the anchored `grep` is the only thing that can catch its loss.
+- `docker info | grep 'Docker Root Dir'` on its own proves nothing: it prints the
+  *configured* path whether or not anything is mounted there, which is the silent
+  failure the drop-in exists to catch. It is worth running only next to the
+  `findmnt` line above, which says whether anything is actually mounted.
+- A `hostname`/`machine-id` "differs from the source" check cannot fail once the
+  scrub has emptied both on the source. Test the shape instead: a valid
+  machine-id is 32 hex characters, and a clone still named `localhost` is the
+  broken case even though it does differ.
+- `curl` answering `{"overloaded":false}` says the telemetry agent is up, not
+  that Docker is: it reads only `/proc` and will answer happily on a worker whose
+  dockerd refused to start.
+
+Finally, from the orchestrator, the check that proves the premise:
+
+```sh
+sudo sed -i '/academy-docker-worker/d' /etc/hosts      # drop any earlier bake's entry
+echo '<new-worker-ip> academy-docker-worker' | sudo tee -a /etc/hosts
+sudo env DOCKER_CERT_PATH=/root/.docker_certs \
+  docker -H tcp://academy-docker-worker:2376 --tlsverify info
+sudo sed -i '/academy-docker-worker/d' /etc/hosts
+```
+
+Delete the entry before *and* after, and note that a leftover one is worse than
+it looks: Ubuntu's `/etc/host.conf` sets `multi on`, and the Docker CLI is a Go
+binary that collects *every* matching line and dials them with fallback. So a
+stale entry from an earlier bake does not merely shadow the new worker — this
+check can pass by falling through to the old one even when the new worker's
+dockerd is completely dead. That is the single failure mode the check exists to
+rule out, so leaving the entry behind inverts it.
+
+`DOCKER_CERT_PATH` is needed because a bare `--tlsverify` reads `~/.docker`,
+which is empty for the login user; the orchestrator's client material is staged
+under `/root/.docker_certs`.
+
+By name, not by IP: the certificate is issued for the name, and the Docker CLI
+has no flag to verify against a different one, so dialling the address fails on
+the certificate however healthy the worker is. If it validates against a host
+that was never individually provisioned, the image is clonable.

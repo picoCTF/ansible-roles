@@ -22,6 +22,25 @@ multihost_docker_registry: "REPLACE_ME:5000"
 
 storage_quotas: yes
 storage_device: "/dev/nvme1n1"
+# Filesystem label for that volume, and what fstab mounts by. The device above
+# is used only to format it the first time: a label travels inside the
+# filesystem, so it survives a snapshot where a device path does not, which is
+# what lets a worker image be cloned onto a volume AWS gives a new id.
+storage_label: "docker-data"
+
+# Mount options for that volume, written to fstab. This is a whole-value
+# override, not a list to append to, and nothing checks what it contains -- two
+# of the three could not be checked against a live mount even in principle,
+# since nofail never reaches the kernel and x-systemd.* is consumed by systemd.
+# So if you change it, keep all three.
+#
+# pquota is the reason the volume exists: drop it and containers have no
+# writable-layer quota, silently, on a host that otherwise looks healthy. nofail
+# keeps a label that does not resolve from failing local-fs.target and taking
+# the whole boot with it -- docker.service refuses on its own RequiresMountsFor
+# instead, which leaves a host someone can still log into. Both tasks that write
+# the fstab line read this, so they cannot drift apart.
+storage_mount_options: "pquota,nofail,x-systemd.device-timeout=30s"
 
 network_ip_pools: ["192.168.0.0/16"]
 network_prefix_length: 29

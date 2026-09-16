@@ -3,18 +3,177 @@
 # Use a separate XFS volume for Docker graph storage in order
 # to enable volume/writable layer storage quotas
 
+# The volume is found once by device and mounted thereafter by filesystem
+# label. storage_device is only used to format it and to relabel one formatted
+# before this role wrote labels; fstab names the label.
+#
+# That distinction is what makes a worker image clonable. The by-id path AWS
+# gives an EBS volume is built from the volume ID, and restoring a snapshot
+# produces a new volume with a new ID -- so an image baked from a worker whose
+# fstab named a device comes up with a perfectly good, correctly formatted,
+# fully populated filesystem that nothing mounts. A label is part of the block
+# data, so it survives the snapshot along with everything else on the volume.
+#
+# Known limitation, stated rather than guarded: the role assumes storage_device
+# and whatever is mounted at storage_mount_point are the same volume. Nothing
+# here checks that. If they diverge -- a blank disk where NVMe enumeration put
+# storage_device, or a by-id path whose volume was replaced -- the label can be
+# written to one volume while fstab is pointed at the label, and a later boot
+# can mount the wrong one. An earlier revision tried to verify this and the
+# verification was wrong in more ways than the thing it was verifying, so it is
+# a documented assumption again. Check it by hand before baking an image:
+# `blkid -c /dev/null -o device -t LABEL=<label>` should name exactly the device
+# `findmnt -no SOURCE <mount point>` reports.
+
+# XFS stores the label in sb_fname, which is 12 bytes; the default is 11. Of the
+# three ways this file can write a label, only two report an overflow in a way
+# that stops the play: mkfs.xfs exits 1 and xfs_io exits 1, but xfs_admin
+# truncates, warns to stdout that nothing here reads, and exits 0 -- leaving 12
+# characters on disk, the full string in fstab, and every later run disagreeing
+# with itself. \A and \Z rather than ^ and $ because Python's $ also matches
+# before a trailing newline, and a label ending in one is accepted and then
+# splits the fstab line in two.
+- name: Check that the Docker data volume label is usable
+  ansible.builtin.assert:
+    that:
+      - storage_label | string is match('\A[A-Za-z0-9_.-]{1,12}\Z')
+    fail_msg: >-
+      storage_label must be 1-12 characters from [A-Za-z0-9_.-] (XFS caps the
+      on-disk label at 12 bytes); got {{ storage_label | to_json }}
+    quiet: yes
+
 - name: Ensure Docker data volume is formatted as XFS
   community.general.filesystem:
     dev: "{{ storage_device }}"
     fstype: xfs
+    opts: "-L {{ storage_label }}"
+
+- name: Read the Docker data volume's filesystem label
+  ansible.builtin.command:
+    argv: ["blkid", "-c", "/dev/null", "-s", "LABEL", "-o", "value", "{{ storage_device }}"]
+  register: storage_volume_label
+  changed_when: no
+  # An unlabelled device is the answer here, not a failure: blkid exits 0 and
+  # prints nothing for a filesystem carrying no label. 2 means no filesystem at
+  # all, which the format task above has already ruled out, and anything else is
+  # a broken probe -- neither must be read as "unlabelled", because that reading
+  # is what opens the relabel below.
+  failed_when: storage_volume_label.rc not in [0, 2]
+  # ansible.builtin.command is skipped under --check without creates/removes,
+  # which would leave stdout undefined for the two when: clauses below.
+  check_mode: false
+  # -c /dev/null reads the disk rather than blkid's cache, which the format task
+  # above may just have invalidated.
+
+# Which of the two relabel paths applies is asked live rather than read from
+# ansible_mounts. The fact is a snapshot from play start, and the online relabel
+# below writes through a PATH: FS_IOC_SETFSLABEL is a generic VFS ioctl, so if
+# the volume went away after facts were gathered, storage_mount_point is a plain
+# directory on the root filesystem and xfs_io would relabel THAT. Ubuntu cloud
+# images mount / by label and its fstab entry has no nofail, so the host would
+# not boot again.
+- name: Check whether the Docker data volume is mounted
+  ansible.builtin.command:
+    argv: ["findmnt", "-no", "TARGET", "{{ storage_mount_point }}"]
+  register: storage_mounted
+  changed_when: no
+  # 1 is findmnt's only failure code and covers "not a mount point", which is
+  # the fresh-provision case.
+  failed_when: storage_mounted.rc not in [0, 1]
+  check_mode: false
+
+- name: Label the Docker data volume while it is mounted
+  # Every worker built before this role used labels reaches here. XFS can be
+  # relabelled online, which is the only option available: the mount is
+  # dockerd's data-root, so unmounting it would mean stopping the daemon and
+  # killing every running challenge.
+  #
+  # Invisible to --check: ansible.builtin.command is skipped there, so a dry run
+  # shows only the fstab write and gives no sign that a live relabel is coming.
+  ansible.builtin.command:
+    argv:
+      - xfs_io
+      - "-x"
+      - "-c"
+      - "label -s {{ storage_label }}"
+      - "{{ storage_mount_point }}"
+  when:
+    - storage_volume_label.rc == 0
+    - storage_volume_label.stdout | default('') | trim != storage_label | string
+    - storage_mounted.rc == 0
+  changed_when: yes
+
+- name: Label the Docker data volume while it is unmounted
+  ansible.builtin.command:
+    argv: ["xfs_admin", "-L", "{{ storage_label }}", "{{ storage_device }}"]
+  when:
+    - storage_volume_label.rc == 0
+    - storage_volume_label.stdout | default('') | trim != storage_label | string
+    - storage_mounted.rc != 0
+  changed_when: yes
+
+- name: Ensure the Docker data volume is recorded in fstab, by label
+  # Deliberately "present" rather than "mounted", and the reason is not that the
+  # mount is busy -- a remount does not need an idle filesystem. It is what
+  # ansible.posix.mount does when a remount fails: remount() falls through to
+  # `umount` and then a fresh `mount`, and the guard that would refuse instead
+  # only applies to state: remounted. On a serving worker this mount is dockerd's
+  # data-root, and the fstab text does change on the migration run (device ->
+  # LABEL=), so an unconditional state: mounted would issue a remount against
+  # every worker in the fleet with that fallback armed behind it.
+  #
+  # The cost is that the module's fstab rollback (ansible/ansible#59183) is
+  # inert: it restores the fstab this task has already written. That rollback
+  # exists to stop a failed mount leaving an unbootable entry, and it only runs
+  # on the state: mounted path below -- which after this split is fresh
+  # provision only, where nofail already keeps the host bootable and the
+  # RequiresMountsFor drop-in makes the failure visible. Losing it there is the
+  # smaller risk.
+  #
+  # The entry takes effect at the next boot, which for an image baked from this
+  # host is the only boot that matters.
+  ansible.posix.mount:
+    path: "{{ storage_mount_point }}"
+    src: "LABEL={{ storage_label }}"
+    fstype: xfs
+    opts: "{{ storage_mount_options }}"
+    state: present
+  # ansible.posix.mount writes fstab and nothing else; the unit systemd derives
+  # from it is only regenerated on a daemon-reload. Without this, a later run
+  # that changes only the label leaves systemd holding a unit naming the old one,
+  # and docker.service refuses to start at the next restart.
+  notify:
+    - Reload systemd config
 
 - name: Ensure the Docker data volume is mounted
   ansible.posix.mount:
     path: "{{ storage_mount_point }}"
-    src: "{{ storage_device }}"
+    src: "LABEL={{ storage_label }}"
     fstype: xfs
-    opts: pquota
+    opts: "{{ storage_mount_options }}"
     state: mounted
+  when: storage_mounted.rc != 0
+
+# nofail cuts both ways. It is what keeps an unresolvable label off the boot
+# path, but mount(8) reads it as "do not report errors for this device if it does
+# not exist" -- so when LABEL= does not resolve, `mount` exits 0 having mounted
+# nothing and the task above reports success. Nothing later notices: the grow
+# task returns "XFS filesystem is using the whole device" before it ever checks
+# for a mount point, and reads the size from the device with xfs_info. Without
+# this the run is green while storage_mount_point is an empty directory on the
+# root disk and daemon.json is about to name it as data-root.
+#
+# This asks one question -- is anything mounted there -- and answers it from the
+# live system. It is not a check that the RIGHT volume is mounted; see the note
+# at the top of this file for what is not verified and how to check it by hand.
+- name: Confirm something is now mounted at the data volume's mount point
+  ansible.builtin.command:
+    argv: ["findmnt", "-no", "TARGET", "{{ storage_mount_point }}"]
+  register: storage_mounted_after
+  changed_when: no
+  failed_when: storage_mounted_after.rc != 0
+  check_mode: false
+  when: not ansible_check_mode
 
 - name: Grow the filesystem if necessary
   # community.general.filesystem cannot grow XFS filesystems unless they are already

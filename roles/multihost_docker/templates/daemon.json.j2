@@ -5,7 +5,7 @@
     "tlscert": "{{ server_cert_path }}",
     "tlskey": "{{ server_key_path }}",
 
-    {% if storage_quotas %}
+    {% if storage_quotas | bool %}
     "data-root": "{{ storage_mount_point }}",
     {% endif %}
     "storage-driver": "overlay2",
@@ -21,11 +21,11 @@
         {% endfor %}
     ],
 
-    {% if userns_remap_enabled %}
+    {% if userns_remap_enabled | bool %}
     "userns-remap": "default",
     {% endif %}
 
-    {% if oci_interceptor_enabled %}
+    {% if oci_interceptor_enabled | bool %}
     {#
       runtimeArgs is deliberately omitted. Docker generates its own non-exec
       /bin/sh wrapper for any runtime with a non-empty runtimeArgs, and that

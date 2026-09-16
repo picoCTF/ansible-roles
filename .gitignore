@@ -3,3 +3,7 @@ fetched/
 .vagrant/
 example-playbook.yml
 .ansible/
+
+# loop-mount point and image used when testing XFS labelling locally
+mnt/
+*.img
