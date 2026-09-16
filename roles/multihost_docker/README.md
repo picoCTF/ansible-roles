@@ -578,7 +578,9 @@ grep -E '^LABEL=docker-data\s+/mnt/docker-data\s+xfs\s+\S*\bnofail\b' /etc/fstab
 findmnt -no SOURCE,FSTYPE,OPTIONS /mnt/docker-data   # device, xfs, prjquota
 sudo blkid -c /dev/null -o device -t LABEL=docker-data  # exactly one device, and
 findmnt -no SOURCE /mnt/docker-data                     # it must be this one
-systemctl show docker.service -p RequiresMountsFor   # /mnt/docker-data
+# -p prints an empty value and exits 0 for a unit that does not exist or failed
+# to load, so grep for the path rather than reading the output
+systemctl show docker.service -p RequiresMountsFor | grep -q /mnt/docker-data
 docker info --format '{{.DockerRootDir}}'            # under /mnt/docker-data
 docker images                                        # cache came over in the snapshot
 

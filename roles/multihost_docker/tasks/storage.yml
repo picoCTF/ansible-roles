@@ -54,11 +54,16 @@
   register: storage_volume_label
   changed_when: no
   # An unlabelled device is the answer here, not a failure: blkid exits 0 and
-  # prints nothing for a filesystem carrying no label. 2 means no filesystem at
-  # all, which the format task above has already ruled out, and anything else is
-  # a broken probe -- neither must be read as "unlabelled", because that reading
-  # is what opens the relabel below.
-  failed_when: storage_volume_label.rc not in [0, 2]
+  # prints nothing for a filesystem carrying no label. Any non-zero rc is a
+  # broken probe and must stop the play, because "could not read the label" and
+  # "there is no label" produce identical stdout, and the second opens the
+  # relabel below while the first means nothing is known.
+  #
+  # rc 2 in particular must not be tolerated. It is blkid's "no filesystem", which
+  # the format task above has already ruled out -- and it is also what
+  # module_utils reports when the binary cannot be exec'd at all (fail_json with
+  # rc=errno, ENOENT=2), which failed_when would then override into success.
+  failed_when: storage_volume_label.rc != 0
   # ansible.builtin.command is skipped under --check without creates/removes,
   # which would leave stdout undefined for the two when: clauses below.
   check_mode: false
@@ -98,7 +103,6 @@
       - "label -s {{ storage_label }}"
       - "{{ storage_mount_point }}"
   when:
-    - storage_volume_label.rc == 0
     - storage_volume_label.stdout | default('') | trim != storage_label | string
     - storage_mounted.rc == 0
   changed_when: yes
@@ -107,7 +111,6 @@
   ansible.builtin.command:
     argv: ["xfs_admin", "-L", "{{ storage_label }}", "{{ storage_device }}"]
   when:
-    - storage_volume_label.rc == 0
     - storage_volume_label.stdout | default('') | trim != storage_label | string
     - storage_mounted.rc != 0
   changed_when: yes
