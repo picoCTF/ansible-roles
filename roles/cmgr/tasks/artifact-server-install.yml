@@ -8,10 +8,22 @@
   register: artifact_server_binary
 
 - name: Determine installed cmgr-artifact-server version
-  ansible.builtin.shell:
-    cmd: echo "v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
+  ansible.builtin.command:
+    cmd: "{{ install_location }}/cmgr-artifact-server -V"
   when: (artifact_server_upgrade | bool) and artifact_server_binary.stat.exists
   register: artifact_server_version_output
+  changed_when: false
+
+# The probe prints "<name> <version>" and releases are tagged v<version>. It was
+# a shell pipeline through cut, but the task's exit status came from echo rather
+# than the probe -- so a probe that failed reported success and compared as a
+# bare "v", silently forcing a reinstall instead of failing the play.
+- name: Record the installed cmgr-artifact-server version
+  ansible.builtin.set_fact:
+    artifact_server_probed_version: "v{{ (probe | trim).split(' ')[1] if (probe | trim).split(' ') | length > 1 else (probe | trim) }}"
+  vars:
+    probe: "{{ artifact_server_version_output.stdout | default('') }}"
+  when: (artifact_server_upgrade | bool) and artifact_server_binary.stat.exists
 
 - name: Determine latest cmgr-artifact-server version
   ansible.builtin.uri:
@@ -23,7 +35,7 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and artifact_server_version_output.stdout != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and artifact_server_version_output.stdout != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
+    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and artifact_server_probed_version != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and artifact_server_probed_version != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for downloads
   ansible.builtin.tempfile:

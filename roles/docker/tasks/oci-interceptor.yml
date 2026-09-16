@@ -8,10 +8,22 @@
   register: oci_interceptor_binary
 
 - name: Determine installed oci-interceptor version
-  ansible.builtin.shell:
-    cmd: echo "v`{{ oci_interceptor_install_path }}/oci-interceptor --oi-version | cut -d ' ' -f 2,2`"
+  ansible.builtin.command:
+    cmd: "{{ oci_interceptor_install_path }}/oci-interceptor --oi-version"
   when: (oci_interceptor_upgrade | bool) and oci_interceptor_binary.stat.exists
   register: oci_interceptor_version_output
+  changed_when: false
+
+# The probe prints "<name> <version>" and releases are tagged v<version>. It was
+# a shell pipeline through cut, but the task's exit status came from echo rather
+# than the probe -- so a probe that failed reported success and compared as a
+# bare "v", silently forcing a reinstall instead of failing the play.
+- name: Record the installed oci-interceptor version
+  ansible.builtin.set_fact:
+    oci_interceptor_probed_version: "v{{ (probe | trim).split(' ')[1] if (probe | trim).split(' ') | length > 1 else (probe | trim) }}"
+  vars:
+    probe: "{{ oci_interceptor_version_output.stdout | default('') }}"
+  when: (oci_interceptor_upgrade | bool) and oci_interceptor_binary.stat.exists
 
 - name: Determine latest oci-interceptor version
   ansible.builtin.uri:
@@ -23,7 +35,7 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    oci_interceptor_installation_required: "{{ (not oci_interceptor_binary.stat.exists) or ((oci_interceptor_upgrade | bool) and oci_interceptor_version != 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_version) or ((oci_interceptor_upgrade | bool) and oci_interceptor_version == 'latest' and oci_interceptor_version_output.stdout != oci_interceptor_latest_version_response.url.split('/tag/')[1]) }}"
+    oci_interceptor_installation_required: "{{ (not oci_interceptor_binary.stat.exists) or ((oci_interceptor_upgrade | bool) and oci_interceptor_version != 'latest' and oci_interceptor_probed_version != oci_interceptor_version) or ((oci_interceptor_upgrade | bool) and oci_interceptor_version == 'latest' and oci_interceptor_probed_version != oci_interceptor_latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for download
   ansible.builtin.tempfile:

@@ -13,11 +13,22 @@
 # below has to be checked against what this host will actually run, and a host
 # that installs nothing this pass still runs whatever is already there.
 - name: Determine installed cmgr-artifact-server version
-  ansible.builtin.shell:
-    cmd: echo "v`{{ install_location }}/cmgr-artifact-server -V | cut -d ' ' -f 2,2`"
+  ansible.builtin.command:
+    cmd: "{{ install_location }}/cmgr-artifact-server -V"
   when: artifact_server_binary.stat.exists
   changed_when: false
   register: artifact_server_version_output
+
+# The probe prints "<name> <version>" and releases are tagged v<version>. It was
+# a shell pipeline through cut, but the task's exit status came from echo rather
+# than the probe -- so a probe that failed reported success and compared as a
+# bare "v", silently forcing a reinstall instead of failing the play.
+- name: Record the installed cmgr-artifact-server version
+  ansible.builtin.set_fact:
+    artifact_server_probed_version: "v{{ (probe | trim).split(' ')[1] if (probe | trim).split(' ') | length > 1 else (probe | trim) }}"
+  vars:
+    probe: "{{ artifact_server_version_output.stdout | default('') }}"
+  when: artifact_server_binary.stat.exists
 
 - name: Determine latest cmgr-artifact-server version
   ansible.builtin.uri:
@@ -29,11 +40,11 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and (artifact_server_version_output.stdout | default('') | trim) != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and (artifact_server_version_output.stdout | default('') | trim) != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
+    artifact_server_installation_required: "{{ (not artifact_server_binary.stat.exists) or ((artifact_server_upgrade | bool) and artifact_server_version != 'latest' and (artifact_server_probed_version) != artifact_server_version) or ((artifact_server_upgrade | bool) and artifact_server_version == 'latest' and (artifact_server_probed_version) != artifact_server_latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Determine which cmgr-artifact-server version this host will run
   ansible.builtin.set_fact:
-    artifact_server_target_version: "{{ ((artifact_server_latest_version_response.url.split('/tag/')[1] if artifact_server_version == 'latest' else artifact_server_version) if (artifact_server_installation_required | bool) else (artifact_server_version_output.stdout | default('') | trim)) | regex_replace('^v', '') }}"
+    artifact_server_target_version: "{{ ((artifact_server_latest_version_response.url.split('/tag/')[1] if artifact_server_version == 'latest' else artifact_server_version) if (artifact_server_installation_required | bool) else (artifact_server_probed_version)) | regex_replace('^v', '') }}"
 
 # A build plane writes one subdirectory of the artifact directory per
 # destination, and only v3 treats those as namespaces -- it looks for the
