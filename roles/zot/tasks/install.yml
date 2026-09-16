@@ -53,6 +53,7 @@
     dest: "{{ zot_download_dir.path }}"
     url: "{{ zot_download_url }}"
     checksum: "{{ zot_checksum | default('') | ternary(zot_checksum, omit) }}"
+    mode: "0644"
   when: zot_installation_required
 
 - name: Copy zot binary to install location

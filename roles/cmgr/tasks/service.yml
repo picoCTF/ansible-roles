@@ -14,6 +14,7 @@
     dest: "{{ systemd_unit_dir }}/cmgrd.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0600"
   register: cmgrd_unit
   notify:
     - Reload systemd config
@@ -25,6 +26,7 @@
     dest: "{{ systemd_unit_dir }}/cmgrd_{{ item.suffix }}.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0600"
   register: "cmgrd_suffixed_units"
   notify:
     - Reload systemd config

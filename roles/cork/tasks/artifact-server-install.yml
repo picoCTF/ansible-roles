@@ -80,6 +80,7 @@
   ansible.builtin.get_url:
     dest: "{{ artifact_server_download_dir.path }}"
     url: "{{ artifact_server_github_url }}/releases/download/{{ artifact_server_latest_version_response.url.split('/tag/')[1] if artifact_server_version == 'latest' else artifact_server_version }}/{{ artifact_server_binary_filename }}"
+    mode: "0644"
   when: artifact_server_installation_required
 
 - name: Unpack cmgr-artifact-server binary

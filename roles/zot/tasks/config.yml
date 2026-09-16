@@ -6,5 +6,6 @@
     dest: "{{ zot_config_dir }}/config.json"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   notify:
     - Restart zot

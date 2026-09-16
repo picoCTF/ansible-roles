@@ -6,4 +6,5 @@
     dest: "{{ config_file_path }}"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: agent_config

@@ -8,6 +8,7 @@
     dest: "{{ systemd_unit_dir }}/zot.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: zot_unit
   notify:
     - Reload systemd config

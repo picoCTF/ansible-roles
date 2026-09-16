@@ -57,6 +57,7 @@
       ansible.builtin.file:
         path: "{{ systemd_ufw_drop_in_dir }}"
         state: directory
+        mode: "0755"
 
     # Modifies ufw.service to start after docker.service, so that the DOCKER-USER iptables chain exists to modify.
     - name: Ensure ufw.service drop-in unit exists
@@ -64,6 +65,7 @@
         src: "ufw.service_override.conf"
         dest: "{{ systemd_ufw_drop_in_dir }}/override.conf"
         force: yes
+        mode: "0644"
       notify:
         - Reload systemd config
 

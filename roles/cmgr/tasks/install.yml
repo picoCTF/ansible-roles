@@ -35,6 +35,7 @@
   ansible.builtin.get_url:
     dest: "{{ download_dir.path }}"
     url: "{{ cmgr_github_url }}/releases/download/{{ latest_version_response.url.split('/tag/')[1] if version == 'latest' else version }}/{{ cmgr_binaries_filename }}"
+    mode: "0644"
   when: installation_required
 
 - name: Unpack cmgr binaries
@@ -64,6 +65,7 @@
   ansible.builtin.get_url:
     dest: "{{ download_dir.path }}"
     url: "{{ cmgr_github_url }}/releases/download/{{ latest_version_response.url.split('/tag/')[1] if version == 'latest' else version }}/{{ cmgr_examples_filename }}"
+    mode: "0644"
   when: installation_required and download_example_challenges
 
 - name: Ensure example challenge directory is removed
@@ -76,6 +78,7 @@
   ansible.builtin.file:
     path: "{{ example_challenge_dir }}"
     state: directory
+    mode: "0755"
   when: installation_required and download_example_challenges
 
 - name: Unpack example challenges

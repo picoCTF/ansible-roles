@@ -35,6 +35,7 @@
     dest: "{{ runner_dir }}/config.json"
     lstrip_blocks: yes
     force: yes
+    mode: "0600"
   when: configuration_required
 
 # Stays a shell task: the RUNNER_ALLOW_RUNASROOT=1 prefix is shell syntax, and

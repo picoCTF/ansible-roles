@@ -47,6 +47,7 @@
   ansible.builtin.get_url:
     dest: "{{ docker_reaper_download_dir.path }}"
     url: "{{ docker_reaper_github_url }}/releases/download/{{ docker_reaper_latest_version_response.url.split('/tag/')[1] if docker_reaper_version == 'latest' else docker_reaper_version }}/{{ docker_reaper_binary_filename }}"
+    mode: "0644"
   when: docker_reaper_installation_required
 
 - name: Unpack docker-reaper binary
@@ -120,6 +121,7 @@
     dest: "{{ systemd_unit_dir }}/docker_reaper.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: docker_reaper_service_unit
   notify:
     - Reload systemd config
@@ -136,6 +138,7 @@
     dest: "{{ systemd_unit_dir }}/docker_reaper.timer"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: docker_reaper_timer_unit
   notify:
     - Reload systemd config
