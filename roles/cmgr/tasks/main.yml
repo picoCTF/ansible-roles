@@ -1,28 +1,28 @@
 ---
 
-- include_tasks: clean-upgrade.yml
+- ansible.builtin.include_tasks: clean-upgrade.yml
   when: (upgrade | bool) and (clean_upgrade | bool)
   args:
     apply:
       become: yes
 
-- include_tasks: install.yml
+- ansible.builtin.include_tasks: install.yml
   args:
     apply:
       become: yes
 
-- include_tasks: service.yml
+- ansible.builtin.include_tasks: service.yml
   when: cmgrd_service_enabled | bool
   args:
     apply:
       become: yes
 
-- include_tasks: artifact-server-install.yml
+- ansible.builtin.include_tasks: artifact-server-install.yml
   args:
     apply:
       become: yes
 
-- include_tasks: artifact-server-service.yml
+- ansible.builtin.include_tasks: artifact-server-service.yml
   when: artifact_server_service_enabled | bool
   args:
     apply:

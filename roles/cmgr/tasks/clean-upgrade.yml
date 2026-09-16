@@ -97,12 +97,12 @@
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"
 
 - name: Prune unused Docker images
-  ansible.builtin.shell: docker image prune --all --force
+  ansible.builtin.command: docker image prune --all --force
   environment: "{{ cmgr_extra_environment_vars }}"
   when: (not (multi_mode_enabled | bool)) or (multi_mode_include_unsuffixed | bool)
 
 - name: Prune unused Docker images for multi mode instances
-  ansible.builtin.shell: docker image prune --all --force
+  ansible.builtin.command: docker image prune --all --force
   environment: "{{ item.config.cmgr_extra_environment_vars }}"
   when: multi_mode_enabled | bool
   loop: "{{ multi_mode_config | dict2items(key_name='suffix', value_name='config') }}"

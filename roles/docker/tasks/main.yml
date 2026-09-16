@@ -1,54 +1,54 @@
 ---
 
-- include_tasks: install.yml
+- ansible.builtin.include_tasks: install.yml
   args:
     apply:
       become: yes
 
-- include_tasks: group.yml
+- ansible.builtin.include_tasks: group.yml
   args:
     apply:
       become: yes
 
-- include_tasks: certs.yml
+- ansible.builtin.include_tasks: certs.yml
   when: tls_access | bool
   args:
     apply:
       become: yes
 
-- include_tasks: storage.yml
+- ansible.builtin.include_tasks: storage.yml
   when: storage_quotas | bool
   args:
     apply:
       become: yes
 
-- include_tasks: parent-cgroup.yml
+- ansible.builtin.include_tasks: parent-cgroup.yml
   args:
     apply:
       become: yes
 
-- include_tasks: oci-interceptor.yml
+- ansible.builtin.include_tasks: oci-interceptor.yml
   when: oci_interceptor_enabled | bool
   args:
     apply:
       become: yes
 
-- include_tasks: firewall.yml
+- ansible.builtin.include_tasks: firewall.yml
   args:
     apply:
       become: yes
 
-- include_tasks: sysctls.yml
+- ansible.builtin.include_tasks: sysctls.yml
   args:
     apply:
       become: yes
 
-- include_tasks: config.yml
+- ansible.builtin.include_tasks: config.yml
   args:
     apply:
       become: yes
 
-- include_tasks: docker-reaper.yml
+- ansible.builtin.include_tasks: docker-reaper.yml
   when: docker_reaper_enabled | bool
   args:
     apply:

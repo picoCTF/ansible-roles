@@ -1,5 +1,5 @@
 ---
-- include_tasks: tasks.yml
+- ansible.builtin.include_tasks: tasks.yml
   args:
     apply:
       become: yes

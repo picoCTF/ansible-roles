@@ -1,28 +1,28 @@
 ---
 
-- include_tasks: needrestart.yml  # TODO(drop-jammy): remove release gate once jammy is phased out
+- ansible.builtin.include_tasks: needrestart.yml  # TODO(drop-jammy): remove release gate once jammy is phased out
   when: ansible_distribution_release == 'noble'
   args:
     apply:
       become: yes
 
-- include_tasks: upgrade.yml
+- ansible.builtin.include_tasks: upgrade.yml
   when: (upgrade_packages != "no") and (upgrade_packages != False)
   args:
     apply:
       become: yes
 
-- include_tasks: journald.yml
+- ansible.builtin.include_tasks: journald.yml
   args:
     apply:
       become: yes
 
-- include_tasks: sysctls.yml
+- ansible.builtin.include_tasks: sysctls.yml
   args:
     apply:
       become: yes
 
-- include_tasks: hostname.yml
+- ansible.builtin.include_tasks: hostname.yml
   when: hostname | default(None) is not none
   args:
     apply:

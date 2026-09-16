@@ -52,7 +52,7 @@
     path: "{{ ca_key_path }}"
     type: RSA
     size: 4096
-    mode: 0400
+    mode: "0400"
     force: yes
   when: recreate_ca_cert
 
@@ -77,7 +77,7 @@
     csr_path: "{{ ca_csr_path }}"
     provider: selfsigned
     selfsigned_not_after: "+{{ tls_expiration_days }}d"
-    mode: 0444
+    mode: "0444"
     force: yes
   when: recreate_ca_cert
   notify:
@@ -108,7 +108,7 @@
     path: "{{ server_key_path }}"
     type: RSA
     size: 4096
-    mode: 0400
+    mode: "0400"
     force: yes
   when: recreate_server_cert
 
@@ -132,7 +132,7 @@
     ownca_path: "{{ ca_cert_path }}"
     ownca_privatekey_path: "{{ ca_key_path }}"
     ownca_not_after: "+{{ tls_expiration_days }}d"
-    mode: 0444
+    mode: "0444"
     force: yes
   when: recreate_server_cert
 
@@ -154,7 +154,7 @@
     path: "{{ client_key_path }}"
     type: RSA
     size: 4096
-    mode: 0400
+    mode: "0400"
     force: yes
   when: recreate_client_cert
 
@@ -177,7 +177,7 @@
     ownca_path: "{{ ca_cert_path }}"
     ownca_privatekey_path: "{{ ca_key_path }}"
     ownca_not_after: "+{{ tls_expiration_days }}d"
-    mode: 0444
+    mode: "0444"
     force: yes
   when: recreate_client_cert
 

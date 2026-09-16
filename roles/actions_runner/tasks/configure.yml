@@ -16,7 +16,7 @@
     configuration_required: "{{ not config_file.stat.exists or (config_contents.content | b64decode | from_json).repo_url != repo_url or (config_contents.content | b64decode | from_json).token != token or (config_contents.content | b64decode | from_json).extra_config_options != extra_config_options }}"
 
 - name: Uninstall old service
-  ansible.builtin.shell:
+  ansible.builtin.command:
     chdir: "{{ runner_dir }}"
     cmd: "./svc.sh uninstall"
   when: configuration_required and config_file.stat.exists
@@ -42,13 +42,13 @@
   when: configuration_required
 
 - name: Install runner service
-  ansible.builtin.shell:
+  ansible.builtin.command:
     chdir: "{{ runner_dir }}"
     cmd: "./svc.sh install root"
   when: configuration_required
 
 - name: Start runner service
-  ansible.builtin.shell:
+  ansible.builtin.command:
     chdir: "{{ runner_dir }}"
     cmd: "./svc.sh start"
   when: configuration_required

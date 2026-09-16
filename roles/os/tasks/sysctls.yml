@@ -1,7 +1,7 @@
 ---
 
 - name: Precompute ephemeral port range parts
-  set_fact:
+  ansible.builtin.set_fact:
     ephemeral_range_start: "{{ ephemeral_port_range.split('-')[0].strip() }}"
     ephemeral_range_end: "{{ ephemeral_port_range.split('-')[1].strip() }}"
   when: ephemeral_port_range is defined and ephemeral_port_range is not none
