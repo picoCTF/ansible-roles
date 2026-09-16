@@ -21,7 +21,9 @@
     cmd: "./svc.sh uninstall"
   when: configuration_required and config_file.stat.exists
 
-- name: Remove old configuration
+# Stays a shell task: the RUNNER_ALLOW_RUNASROOT=1 prefix is shell syntax, and
+# command would look for a binary of that name.
+- name: Remove old configuration # noqa: command-instead-of-shell
   ansible.builtin.shell:
     chdir: "{{ runner_dir }}"
     cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh remove --token {{ (config_contents.content | b64decode | from_json).token }}"
@@ -35,7 +37,9 @@
     force: yes
   when: configuration_required
 
-- name: Configure runner
+# Stays a shell task: the RUNNER_ALLOW_RUNASROOT=1 prefix is shell syntax, and
+# command would look for a binary of that name.
+- name: Configure runner # noqa: command-instead-of-shell
   ansible.builtin.shell:
     chdir: "{{ runner_dir }}"
     cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh --unattended --url {{ repo_url }} --token {{ token }} {{ extra_config_options }}"

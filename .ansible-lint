@@ -1,0 +1,33 @@
+---
+# ansible-lint's report on this repository ran to 758 findings, 600 of which are
+# two deliberate conventions. Nobody reads a report that size, so the two are
+# declared here once and everything else is left visible and worth acting on.
+
+# Settled conventions. These are choices, not defects, and reporting them every
+# run only buries the findings that are.
+skip_list:
+  # Variables are named for the thing they configure rather than for the role
+  # that happens to own the file: oci_interceptor_version, not
+  # docker_oci_interceptor_version. The names cross roles -- docker and
+  # multihost_docker install the same binaries -- so a role prefix would make
+  # the same variable two names. (287 findings)
+  - var-naming[no-role-prefix]
+  # yes/no rather than true/false throughout. (313 findings)
+  - yaml[truthy]
+
+# Worth fixing, not worth failing a build over. These still appear in the
+# report, under WARNING rather than as violations.
+warn_list:
+  # Tasks without a name. Real readability cost in play output, no runtime
+  # effect, and they are concentrated in the older files. (56 findings)
+  - name[missing]
+  # The offenders are single Jinja expressions of 300-470 characters inside
+  # set_fact. In a folded scalar a more-indented continuation line stops
+  # folding and keeps its newline, so the readable reflow is the one that
+  # changes the string: here the rewrite carries more risk than the finding
+  # it clears. (27 findings)
+  - yaml[line-length]
+
+# Everything else stays a violation on purpose, including the four families
+# this pass did not get to: risky-file-permissions, no-changed-when,
+# no-handler and literal-compare.

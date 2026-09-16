@@ -29,11 +29,15 @@ jobs:
   ansible-lint:
     name: ansible-lint (advisory)
     runs-on: ubuntu-latest
-    # Advisory on purpose. Its two largest findings on this repository are
-    # var-naming[no-role-prefix] and truthy -- unprefixed variable names and the
-    # yes/no idiom -- both of which are long-standing choices here rather than
-    # defects. Gating on them would mean a mass rename, so the report is
-    # published for review and does not fail the build.
+    # Still advisory, but no longer drowning. The two long-standing choices
+    # here -- unprefixed variable names and the yes/no idiom -- used to be 600
+    # of 758 findings; .ansible-lint declares them settled so the report is
+    # about everything else. What is left is 73 findings and 83 warnings.
+    #
+    # Gating on it is the goal and needs those 73 cleared first, most of them
+    # risky-file-permissions. Until then the step reports its real exit status
+    # and the job is allowed to fail without failing the build -- which is the
+    # difference between "nothing was found" and "nobody looked".
     continue-on-error: true
     steps:
       - name: Check out code
@@ -43,4 +47,4 @@ jobs:
         run: python3 -m pip install --user --quiet ansible-lint
 
       - name: Run ansible-lint
-        run: ~/.local/bin/ansible-lint -f pep8 --nocolor || true
+        run: ~/.local/bin/ansible-lint -f pep8 --nocolor
