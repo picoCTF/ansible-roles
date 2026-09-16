@@ -7,7 +7,7 @@
       become: yes
 
 - ansible.builtin.include_tasks: upgrade.yml
-  when: (upgrade_packages != "no") and (upgrade_packages != False)
+  when: upgrade_packages not in ["no", false]
   args:
     apply:
       become: yes

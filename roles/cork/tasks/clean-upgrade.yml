@@ -39,9 +39,12 @@
 - name: Remove existing artifact tarballs
   ansible.builtin.shell: /bin/rm -rf {{ cork_artifact_dir }}/*
   when: artifact_server_enabled | bool
+  changed_when: true
 
 # Only where this host builds. An orchestrator on an external build plane has no
 # docker daemon at all, and the images are on the plane and in the registry.
 - name: Prune unused Docker images
   ansible.builtin.command: docker image prune --all --force
   when: cork_build_plane != "external" or (cork_builder_enabled | bool)
+  register: image_prune
+  changed_when: "'Total reclaimed space: 0B' not in image_prune.stdout"

@@ -20,7 +20,9 @@
     enabled: yes
     state: started
 
-- name: Determine whether to restart zot
+# A trampoline, not a handler: it notifies on a condition the templating task
+# cannot express by itself. Folding it into that task would lose the condition.
+- name: Determine whether to restart zot # noqa: no-handler
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:

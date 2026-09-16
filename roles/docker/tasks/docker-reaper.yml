@@ -112,7 +112,9 @@
     - Restart docker-reaper service unit
   when: (docker_reaper_installation_required or docker_reaper_service_unit.changed)
 
-- name: Determine whether to restart the docker_reaper.timer unit
+# A trampoline, not a handler: it notifies on a condition the templating task
+# cannot express by itself. Folding it into that task would lose the condition.
+- name: Determine whether to restart the docker_reaper.timer unit # noqa: no-handler
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:

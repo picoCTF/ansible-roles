@@ -12,6 +12,7 @@
     cmd: "{{ install_location }}/cmgr_bin version"
   when: (upgrade | bool) and cmgr_binary.stat.exists
   register: cmgr_version_output
+  changed_when: false
 
 - name: Determine latest cmgr version
   ansible.builtin.uri:
@@ -95,9 +96,16 @@
     state: absent
   when: installation_required
 
+# Runs between the binary landing at .../cmgr and the wrapper below overwriting
+# that path, so the source here is the real binary, not the wrapper. The download
+# directory is already gone by this point, which is why it copies from
+# install_location rather than from there.
 - name: Create _bin-suffixed copy of cmgr binary
-  ansible.builtin.command:
-    cmd: cp {{ install_location }}/cmgr {{ install_location }}/cmgr_bin
+  ansible.builtin.copy:
+    src: "{{ install_location }}/cmgr"
+    dest: "{{ install_location }}/cmgr_bin"
+    mode: "0755"
+    remote_src: yes
   when: installation_required
 
 - name: Add environment variable wrapper
