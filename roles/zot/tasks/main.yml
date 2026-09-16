@@ -1,32 +1,32 @@
 ---
 
-- include_tasks: install.yml
+- ansible.builtin.include_tasks: install.yml
   args:
     apply:
       become: yes
 
-- include_tasks: user.yml
+- ansible.builtin.include_tasks: user.yml
   args:
     apply:
       become: yes
 
-- include_tasks: storage.yml
+- ansible.builtin.include_tasks: storage.yml
   args:
     apply:
       become: yes
 
-- include_tasks: certs.yml
+- ansible.builtin.include_tasks: certs.yml
   when: zot_deploy_certs | bool
   args:
     apply:
       become: yes
 
-- include_tasks: config.yml
+- ansible.builtin.include_tasks: config.yml
   args:
     apply:
       become: yes
 
-- include_tasks: service.yml
+- ansible.builtin.include_tasks: service.yml
   when: zot_service_enabled | bool
   args:
     apply:

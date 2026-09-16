@@ -1,10 +1,10 @@
 ---
-- include_tasks: install.yml
+- ansible.builtin.include_tasks: install.yml
   args:
     apply:
       become: yes
 
-- include_tasks: configure.yml
+- ansible.builtin.include_tasks: configure.yml
   args:
     apply:
       become: yes

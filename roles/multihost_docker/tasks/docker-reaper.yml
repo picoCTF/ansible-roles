@@ -8,10 +8,22 @@
   register: docker_reaper_binary
 
 - name: Determine installed docker-reaper version
-  ansible.builtin.shell:
-    cmd: echo "v`{{ docker_reaper_install_path }}/docker-reaper --version | cut -d ' ' -f 2,2`"
+  ansible.builtin.command:
+    cmd: "{{ docker_reaper_install_path }}/docker-reaper --version"
   when: (docker_reaper_upgrade | bool) and docker_reaper_binary.stat.exists
   register: docker_reaper_version_output
+  changed_when: false
+
+# The probe prints "<name> <version>" and releases are tagged v<version>. It was
+# a shell pipeline through cut, but the task's exit status came from echo rather
+# than the probe -- so a probe that failed reported success and compared as a
+# bare "v", silently forcing a reinstall instead of failing the play.
+- name: Record the installed docker-reaper version
+  ansible.builtin.set_fact:
+    docker_reaper_probed_version: "v{{ (probe | trim).split(' ')[1] if (probe | trim).split(' ') | length > 1 else (probe | trim) }}"
+  vars:
+    probe: "{{ docker_reaper_version_output.stdout | default('') }}"
+  when: (docker_reaper_upgrade | bool) and docker_reaper_binary.stat.exists
 
 - name: Determine latest docker-reaper version
   ansible.builtin.uri:
@@ -23,7 +35,7 @@
 
 - name: Determine whether (re-)installation is necessary
   ansible.builtin.set_fact:
-    docker_reaper_installation_required: "{{ (not docker_reaper_binary.stat.exists) or ((docker_reaper_upgrade | bool) and docker_reaper_version != 'latest' and docker_reaper_version_output.stdout != docker_reaper_version) or ((docker_reaper_upgrade | bool) and docker_reaper_version == 'latest' and docker_reaper_version_output.stdout != docker_reaper_latest_version_response.url.split('/tag/')[1]) }}"
+    docker_reaper_installation_required: "{{ (not docker_reaper_binary.stat.exists) or ((docker_reaper_upgrade | bool) and docker_reaper_version != 'latest' and docker_reaper_probed_version != docker_reaper_version) or ((docker_reaper_upgrade | bool) and docker_reaper_version == 'latest' and docker_reaper_probed_version != docker_reaper_latest_version_response.url.split('/tag/')[1]) }}"
 
 - name: Create temporary directory for download
   ansible.builtin.tempfile:
@@ -35,6 +47,7 @@
   ansible.builtin.get_url:
     dest: "{{ docker_reaper_download_dir.path }}"
     url: "{{ docker_reaper_github_url }}/releases/download/{{ docker_reaper_latest_version_response.url.split('/tag/')[1] if docker_reaper_version == 'latest' else docker_reaper_version }}/{{ docker_reaper_binary_filename }}"
+    mode: "0644"
   when: docker_reaper_installation_required
 
 - name: Unpack docker-reaper binary
@@ -108,6 +121,7 @@
     dest: "{{ systemd_unit_dir }}/docker_reaper.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: docker_reaper_service_unit
   notify:
     - Reload systemd config
@@ -124,6 +138,7 @@
     dest: "{{ systemd_unit_dir }}/docker_reaper.timer"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: docker_reaper_timer_unit
   notify:
     - Reload systemd config
@@ -141,7 +156,9 @@
     - Restart docker-reaper service unit
   when: (docker_reaper_installation_required or docker_reaper_service_unit.changed)
 
-- name: Determine whether to restart the docker_reaper.timer unit
+# A trampoline, not a handler: it notifies on a condition the templating task
+# cannot express by itself. Folding it into that task would lose the condition.
+- name: Determine whether to restart the docker_reaper.timer unit # noqa: no-handler
   ansible.builtin.assert: { that: true, quiet: true }
   changed_when: true
   notify:

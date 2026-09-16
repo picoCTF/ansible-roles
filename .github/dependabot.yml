@@ -1,0 +1,35 @@
+version: 2
+
+# The lint gate is blocking and its toolchain is pinned, so something has to
+# propose the upgrades. ansible-lint releases roughly monthly.
+#
+# Nothing is offered until it has been public for seven days. A release that is
+# yanked or hotfixed usually is within that window, and here the toolchain
+# decides whether everyone's PR is red, so there is no value in being first.
+updates:
+  # The pinned lint toolchain. Kept in its own directory with the canonical
+  # filename so there is no ambiguity about what gets discovered.
+  - package-ecosystem: pip
+    directory: /ci/lint
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+    labels:
+      - dependencies
+
+  # Workflow actions are pinned by commit SHA, which is what makes them
+  # reproducible and also what makes them invisible to a human reading for
+  # staleness.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies

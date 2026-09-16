@@ -89,6 +89,7 @@
   ansible.builtin.get_url:
     dest: "{{ download_dir.path }}"
     url: "{{ cork_github_url }}/releases/download/{{ latest_version_response.url.split('/tag/')[1] if cork_version == 'latest' else cork_version }}/{{ cork_binaries_filename }}"
+    mode: "0644"
   when: installation_required
 
 - name: Unpack cork binaries

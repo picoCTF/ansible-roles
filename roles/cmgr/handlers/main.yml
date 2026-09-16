@@ -1,6 +1,6 @@
 ---
 - name: Reload systemd config
-  systemd:
+  ansible.builtin.systemd:
     daemon_reload: yes
   become: yes
 

@@ -65,6 +65,7 @@
     src: "limit_docker.slice.j2"
     dest: "{{ parent_cgroup_path }}"
     force: yes
+    mode: "0644"
   notify:
     - Reload systemd config
     # The boot script's --runtime drop-in in /run/systemd/system.control/ outranks
@@ -80,12 +81,14 @@
   ansible.builtin.file:
     path: "{{ system_slice_drop_in_dir }}"
     state: directory
+    mode: "0755"
 
 - name: Ensure system.slice memory reserve drop-in exists
   ansible.builtin.template:
     src: "system_slice_reserve.conf.j2"
     dest: "{{ system_slice_drop_in_dir }}/10-memory-reserve.conf"
     force: yes
+    mode: "0644"
   notify:
     - Reload systemd config
 
@@ -93,6 +96,7 @@
   ansible.builtin.file:
     path: "{{ user_slice_drop_in_dir }}"
     state: directory
+    mode: "0755"
 
 # Interactive ssh sessions live in user.slice, which the system.slice reserve
 # does not cover.
@@ -101,6 +105,7 @@
     src: "user_slice_reserve.conf.j2"
     dest: "{{ user_slice_drop_in_dir }}/10-memory-reserve.conf"
     force: yes
+    mode: "0644"
   notify:
     - Reload systemd config
 
@@ -118,6 +123,7 @@
     src: "docker_cgroup_quota.service.j2"
     dest: "{{ systemd_unit_dir }}/docker_cgroup_quota.service"
     force: yes
+    mode: "0644"
   notify:
     - Reload systemd config
     - Apply Docker cgroup quota

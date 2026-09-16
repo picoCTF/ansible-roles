@@ -14,7 +14,7 @@
     dest: "{{ systemd_unit_dir }}/cmgr_artifact_server.service"
     lstrip_blocks: yes
     force: yes
-    mode: "0644"
+    mode: "0600"
   register: cmgr_artifact_server_unit
   notify:
     - Reload systemd config

@@ -6,6 +6,7 @@
     create: yes
     search_string: "SystemMaxUse="
     line: "SystemMaxUse={{ journald_max_size }}"
+    mode: "0644"
   notify: Restart journald
 
 - name: Limit journald volatile storage size
@@ -14,4 +15,5 @@
     create: yes
     search_string: "RuntimeMaxUse="
     line: "RuntimeMaxUse={{ journald_max_size }}"
+    mode: "0644"
   notify: Restart journald

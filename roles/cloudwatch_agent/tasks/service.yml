@@ -8,6 +8,7 @@
     dest: "{{ systemd_unit_dir }}/cloudwatch_agent.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: agent_unit
   notify:
     - Reload systemd config

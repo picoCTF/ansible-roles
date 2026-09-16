@@ -38,6 +38,7 @@
   ansible.builtin.get_url:
     dest: "{{ cork_telemetry_download_dir.path }}/{{ cork_telemetry_binary_filename }}"
     url: "{{ cork_telemetry_github_url }}/releases/download/{{ cork_telemetry_latest_version_response.url.split('/tag/')[1] if cork_telemetry_version == 'latest' else cork_telemetry_version }}/{{ cork_telemetry_binary_filename }}"
+    mode: "0644"
   when: cork_telemetry_installation_required
 
 - name: Copy cork-telemetry binary to install location
@@ -62,6 +63,7 @@
     dest: "{{ systemd_unit_dir }}/telemetry.service"
     lstrip_blocks: yes
     force: yes
+    mode: "0644"
   register: telemetry_service_unit
   notify:
     - Reload systemd config

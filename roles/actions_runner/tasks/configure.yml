@@ -16,16 +16,20 @@
     configuration_required: "{{ not config_file.stat.exists or (config_contents.content | b64decode | from_json).repo_url != repo_url or (config_contents.content | b64decode | from_json).token != token or (config_contents.content | b64decode | from_json).extra_config_options != extra_config_options }}"
 
 - name: Uninstall old service
-  ansible.builtin.shell:
+  ansible.builtin.command:
     chdir: "{{ runner_dir }}"
     cmd: "./svc.sh uninstall"
   when: configuration_required and config_file.stat.exists
+  changed_when: true
 
-- name: Remove old configuration
+# Stays a shell task: the RUNNER_ALLOW_RUNASROOT=1 prefix is shell syntax, and
+# command would look for a binary of that name.
+- name: Remove old configuration # noqa: command-instead-of-shell
   ansible.builtin.shell:
     chdir: "{{ runner_dir }}"
     cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh remove --token {{ (config_contents.content | b64decode | from_json).token }}"
   when: configuration_required and config_file.stat.exists
+  changed_when: true
 
 - name: Write new config file
   ansible.builtin.template:
@@ -33,22 +37,28 @@
     dest: "{{ runner_dir }}/config.json"
     lstrip_blocks: yes
     force: yes
+    mode: "0600"
   when: configuration_required
 
-- name: Configure runner
+# Stays a shell task: the RUNNER_ALLOW_RUNASROOT=1 prefix is shell syntax, and
+# command would look for a binary of that name.
+- name: Configure runner # noqa: command-instead-of-shell
   ansible.builtin.shell:
     chdir: "{{ runner_dir }}"
     cmd: "RUNNER_ALLOW_RUNASROOT=1 ./config.sh --unattended --url {{ repo_url }} --token {{ token }} {{ extra_config_options }}"
   when: configuration_required
+  changed_when: true
 
 - name: Install runner service
-  ansible.builtin.shell:
+  ansible.builtin.command:
     chdir: "{{ runner_dir }}"
     cmd: "./svc.sh install root"
   when: configuration_required
+  changed_when: true
 
 - name: Start runner service
-  ansible.builtin.shell:
+  ansible.builtin.command:
     chdir: "{{ runner_dir }}"
     cmd: "./svc.sh start"
   when: configuration_required
+  changed_when: true
