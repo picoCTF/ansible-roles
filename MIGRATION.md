@@ -10,6 +10,80 @@ you have to do.
 
 ---
 
+## Worker data volumes are mounted by label, so a worker can be cloned
+
+**Affects** `multihost_docker` · **Action required: re-run the role on every worker, then
+reboot one before trusting the fleet**
+
+An autoscaled worker has to boot ready, which means an image taken from a host this role
+has already finished with. The blocker was the device path: AWS builds
+`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol<id>` from the volume ID, and a
+snapshot restore produces a new volume with a new ID — so an image baked from a worker
+whose fstab named a device comes up with a perfectly good, fully populated filesystem
+that nothing mounts.
+
+The volume is now labelled (`storage_label`, default `docker-data`) and fstab names the
+label. `storage_device` is still how the volume is found the first time and how one
+formatted before this change is relabelled, so it must still be correct when you re-run.
+
+**Re-running rewrites `/etc/fstab` on every existing worker.** The role relabels the
+filesystem in place — online, so nothing is unmounted and no data moves — and then points
+fstab at the label. Nothing verifies that the relabel took, or that the volume carrying
+the label is the one `storage_device` names: a run can therefore go green and still leave
+a host whose next boot cannot mount the volume. Confirm on one worker before rolling the
+fleet, per the check below.
+
+`docker.service` also gains a `RequiresMountsFor` drop-in, so a worker whose data volume
+does not mount now refuses to start Docker rather than running on the root disk with no
+quotas. Two consequences worth knowing before the next reboot:
+
+- The fstab entry carries `nofail`. Keep it — and note `storage_mount_options` is a
+  whole-value override, so replacing it drops `nofail` silently. Without it an
+  unresolvable label fails `local-fs.target`, whose own `OnFailure=emergency.target`
+  replaces the boot irreversibly; on a cloud image with a locked root account sshd never
+  starts, so there is no way in to diagnose it.
+- On the **iptables** firewall backend only, `ufw.service` carries
+  `Requires=docker.service` (so the `DOCKER-USER` chain exists before it loads its
+  rules), so a host that cannot start Docker will not start ufw either. The default
+  backend is nftables, whose branch removes that drop-in, and
+  `container-egress-filter.service` is ordered `Before=docker.service` rather than
+  dependent on it — so on a default worker neither is affected.
+
+One new way the role can stop rather than converge, deliberately: `storage_label` must be
+1–12 characters, because XFS caps the on-disk label at 12 bytes and one of the three tools
+that writes it truncates past that silently and exits 0.
+
+Before rolling the fleet, apply to one worker and check that the label landed where it
+should have — this is the part the role does not check for you:
+
+```sh
+sudo blkid -c /dev/null -o device -t LABEL=docker-data   # exactly one device
+findmnt -no SOURCE /mnt/docker-data                      # the same device
+```
+
+then reboot it and confirm `findmnt -no SOURCE,FSTYPE,OPTIONS /mnt/docker-data` and
+`systemctl is-active docker`. The imaging procedure, and a fuller post-boot checklist, are
+in the [`multihost_docker` README](./roles/multihost_docker/README.md#baking-a-worker-image).
+
+**`--check` will not show you the relabel.** The label is written by `command` tasks, which
+Ansible skips under check mode, so a dry run reports only the fstab change on a host whose
+volume is not yet labelled. The relabel is online and does not unmount anything, but do not
+read a clean `--check` as meaning the run will not touch the filesystem.
+
+**If a worker's volume was replaced by hand**, check its fstab line before re-running. The
+storage runbook writes a `UUID=` entry with its own tuning and does not label the new
+volume; `ansible.posix.mount` keys on the mount point, so this role will replace that line
+with `LABEL=docker-data` — discarding the tuning, and pointing at a label the replacement
+volume does not carry unless `storage_device` was also updated to match.
+
+Only `multihost_docker` changes. The `docker` and `zot` roles still mount by device,
+without `nofail`, and are untouched — a deliberate scope limit, not a claim that they are
+unaffected. Cloning is not what makes `nofail` matter; an fstab source that stops
+resolving is, and restoring a volume backup on a build plane produces exactly that. Worth
+revisiting for those roles on their own.
+
+---
+
 ## cork splits into a build plane and an orchestrator, and its variables are renamed
 
 **Affects** `cork`, `docker` · **Action required: rewrite the play, and re-provision the
