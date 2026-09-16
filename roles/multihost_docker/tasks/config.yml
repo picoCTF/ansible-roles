@@ -32,6 +32,26 @@
   notify:
     - Reload systemd config
 
+# Same reasoning as above, and the same deliberate omission of "Restart
+# Docker": a dependency takes effect at the next start of docker.service, and
+# restarting to apply it would kill every running challenge for no benefit.
+- name: Ensure docker.service requires the data volume mount
+  ansible.builtin.template:
+    src: "docker_data_mount.conf.j2"
+    dest: "{{ systemd_docker_drop_in_dir }}/20-data-volume.conf"
+    force: yes
+  when: storage_quotas | bool
+  notify:
+    - Reload systemd config
+
+- name: Ensure docker.service requires no mount when there is no data volume
+  ansible.builtin.file:
+    path: "{{ systemd_docker_drop_in_dir }}/20-data-volume.conf"
+    state: absent
+  when: not (storage_quotas | bool)
+  notify:
+    - Reload systemd config
+
 - name: Ensure daemon config file exists
   ansible.builtin.template:
     src: "daemon.json.j2"

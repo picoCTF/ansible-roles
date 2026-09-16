@@ -424,7 +424,64 @@ is not enabled), so this belongs in the same drain window as applying the role.
 | Name | Description | Default |
 | --- | --- | --- |
 | `storage_quotas` | Whether to enable storage quotas by storing daemon state on an XFS filesystem. | `true` |
-| `storage_device` | The block device to format and mount as XFS. | `/dev/nvme1n1` |
+| `storage_device` | The block device to format as XFS. Used only to find the volume the first time and to label it; fstab mounts by `storage_label`, not by this. | `/dev/nvme1n1` |
+| `storage_label` | Filesystem label of that volume, and what fstab mounts. A label is part of the filesystem, so it survives a snapshot where a device path does not — see [Baking a worker image](#baking-a-worker-image). | `docker-data` |
+
+`docker.service` gets a `RequiresMountsFor` drop-in for the mount. Without it, a
+volume that fails to mount leaves dockerd running on a directory of the same
+name on the root volume — a fraction of the space, no project quotas, and no
+error anywhere. The dependency turns that into a clean refusal to start.
+
+## Baking a worker image
+
+An autoscaled worker cannot be provisioned by this role: it has to boot ready,
+which means an image taken from a host this role has already finished with. The
+fleet's dockerd certificates are issued for one shared name
+(`SAN DNS:academy-docker-worker`) precisely so that workers can be cloned
+without reprovisioning, and nothing else in this role writes a per-host
+identity.
+
+Two things do carry identity, and both must be dealt with before imaging.
+
+**The data volume.** `CreateImage` snapshots every attached volume, so an image
+taken from a provisioned worker already carries a formatted, labelled, `pquota`
+XFS volume — with the challenge image cache warm, which is worth having. What
+does *not* survive is the device path: AWS builds
+`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol<id>` from the volume ID,
+and a snapshot restore produces a new volume with a new ID. That is why fstab
+names `LABEL=`. A worker provisioned before this role wrote labels is
+relabelled in place on the next run; nothing is reformatted and no data moves.
+
+**Everything the OS assigns per host.** Scrub before imaging:
+
+```sh
+sudo rm -f /etc/ssh/ssh_host_*          # else every clone shares one host key
+sudo truncate -s 0 /etc/machine-id      # truncate, do not delete
+sudo hostnamectl set-hostname localhost # the os role set this one; cloud-init
+                                        # will not correct a hostname it did
+                                        # not set itself
+sudo cloud-init clean --logs
+```
+
+Then validate one instance launched from the image, outside any scaling group:
+
+```sh
+findmnt /mnt/docker-data                        # xfs, pquota, mounted by label
+docker info | grep 'Docker Root Dir'            # /mnt/docker-data
+xfs_quota -x -c report /mnt/docker-data         # project accounting live
+docker images                                   # cache came over in the snapshot
+hostname; cat /etc/machine-id                   # differ from the source host
+curl -s localhost:2136/health                   # {"overloaded":false}
+```
+
+and, from the orchestrator, the check that actually proves the premise:
+
+```sh
+docker -H tcp://<new-worker-ip>:2376 --tlsverify ... info
+```
+
+If the shared certificate validates against a host that was never individually
+provisioned, the image is clonable.
 
 ### Docker network settings
 
