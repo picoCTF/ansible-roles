@@ -27,24 +27,27 @@ jobs:
         run: python3 ci/check_roles.py
 
   ansible-lint:
-    name: ansible-lint (advisory)
+    name: ansible-lint
     runs-on: ubuntu-latest
-    # Still advisory, but no longer drowning. The two long-standing choices
-    # here -- unprefixed variable names and the yes/no idiom -- used to be 600
-    # of 758 findings; .ansible-lint declares them settled so the report is
-    # about everything else. What is left is 73 findings and 83 warnings.
+    # Blocking. It was advisory while the report ran to 758 findings, 600 of
+    # which were two settled conventions -- unprefixed variable names and the
+    # yes/no idiom. Those are declared in .ansible-lint and the rest were
+    # cleared, so the report is 0 failures and 83 warnings and a new violation
+    # now means someone introduced one.
     #
-    # Gating on it is the goal and needs those 73 cleared first, most of them
-    # risky-file-permissions. Until then the step reports its real exit status
-    # and the job is allowed to fail without failing the build -- which is the
-    # difference between "nothing was found" and "nobody looked".
-    continue-on-error: true
+    # The 83 warnings are name[missing] and yaml[line-length], in warn_list
+    # because they are worth doing and not worth blocking on. They do not fail
+    # this job; only real violations do.
+    #
+    # The toolchain is pinned in ci/lint/requirements.txt rather than inline
+    # here, because Dependabot reads manifests and cannot see a version written
+    # into a run: step. That file explains what the pins are protecting.
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install ansible-lint
-        run: python3 -m pip install --user --quiet ansible-lint
+        run: python3 -m pip install --user --quiet -r ci/lint/requirements.txt
 
       - name: Run ansible-lint
         run: ~/.local/bin/ansible-lint -f pep8 --nocolor

@@ -1,0 +1,9 @@
+# Pinned so the lint gate only moves when someone moves it. A new ansible-lint
+# release that adds a rule would otherwise turn every open PR red without anyone
+# changing a line. ansible-core is pinned alongside it because that is what
+# resolves module names, and a floating one moves the gate just as easily.
+#
+# Dependabot opens the bumps (see .github/dependabot.yml). Expect the report to
+# change when you merge one; that is the point of seeing it in a PR.
+ansible-lint==26.8.0
+ansible-core==2.21.4
