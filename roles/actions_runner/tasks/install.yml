@@ -41,4 +41,3 @@
     path: "{{ runner_dir }}/runner.tar.gz"
     state: absent
   when: installation_required
-

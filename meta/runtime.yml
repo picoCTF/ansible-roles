@@ -1,0 +1,5 @@
+---
+# Lowest ansible-core this collection is tested against. The roles each declare
+# min_ansible_version separately, which is the older floor they were written to;
+# this is the collection-level statement of what is actually supported.
+requires_ansible: ">=2.15.0"
