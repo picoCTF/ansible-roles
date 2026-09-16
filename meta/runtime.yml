@@ -1,5 +1,16 @@
 ---
-# Lowest ansible-core this collection is tested against. The roles each declare
-# min_ansible_version separately, which is the older floor they were written to;
-# this is the collection-level statement of what is actually supported.
-requires_ansible: ">=2.15.0"
+# Lowest ansible-core this collection is supported on. It is set by the control
+# node, not by the roles: deploys run from Ubuntu LTS, and 24.04 packages
+# ansible-core 2.16.3. 26.04 will raise that, and a floor stays valid when it
+# does.
+#
+# The span is wide, because the control node is a distro package while CI and
+# local work run whatever is current. Both ends were exercised: 2.16.3 on an
+# Ubuntu 24.04 host, and 2.21.0, which is the current release at the time of
+# writing. Every builtin this collection names resolves on both, including
+# ansible.builtin.systemd, which is an alias for systemd_service and is not
+# marked deprecated on 2.21.
+#
+# The roles each declare min_ansible_version separately, which is the much older
+# floor they were originally written to rather than anything that gets tested.
+requires_ansible: ">=2.16.3"
