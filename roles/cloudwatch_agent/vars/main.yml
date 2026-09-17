@@ -24,3 +24,11 @@ cloudwatch_agent_arch_map:
   aarch64: arm64
 cloudwatch_agent_arch: "{{ cloudwatch_agent_arch_map[ansible_facts['architecture']] | default('') }}"
 cloudwatch_agent_deb_url: "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/{{ cloudwatch_agent_arch }}/latest/amazon-cloudwatch-agent.deb"
+
+# systemd spells architectures its own way, and ConditionArchitecture silently
+# skips a unit whose value does not match -- so an arm64 host with the x86-64
+# condition installs a service that never starts and reports no error of its own.
+cloudwatch_agent_condition_architecture_map:
+  amd64: x86-64
+  arm64: arm64
+cloudwatch_agent_condition_architecture: "{{ cloudwatch_agent_condition_architecture_map[cloudwatch_agent_arch] | default('') }}"

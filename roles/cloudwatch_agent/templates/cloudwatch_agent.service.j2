@@ -1,7 +1,7 @@
 [Unit]
 Description=CloudWatch Agent
 Documentation=https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html
-ConditionArchitecture=x86-64
+ConditionArchitecture={{ cloudwatch_agent_condition_architecture }}
 
 [Service]
 Type=oneshot
