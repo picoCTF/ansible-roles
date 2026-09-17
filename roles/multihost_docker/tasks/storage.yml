@@ -71,7 +71,7 @@
   # above may just have invalidated.
 
 # Which of the two relabel paths applies is asked live rather than read from
-# ansible_mounts. The fact is a snapshot from play start, and the online relabel
+# ansible_facts['mounts']. The fact is a snapshot from play start, and the online relabel
 # below writes through a PATH: FS_IOC_SETFSLABEL is a generic VFS ioctl, so if
 # the volume went away after facts were gathered, storage_mount_point is a plain
 # directory on the root filesystem and xfs_io would relabel THAT. Ubuntu cloud

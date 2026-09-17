@@ -64,7 +64,7 @@ container_slice_quota_script_path: "/usr/local/sbin/docker-cgroup-quota"
 # mean. An estimate: it errs low (and so under-reserves) when the real mix skews
 # smaller than that mean.
 container_slice_ram_capacity: >-
-  {{ (((ansible_memtotal_mb | int) - (container_slice_os_reserve_mb | int)
+  {{ (((ansible_facts['memtotal_mb'] | int) - (container_slice_os_reserve_mb | int)
         - (container_slice_dockerd_reserve_mb | int) - (container_slice_user_reserve_mb | int))
       // ((container_slice_min_mean_container_mb | int)
           + (container_slice_host_mb_per_container | int))) | int }}
