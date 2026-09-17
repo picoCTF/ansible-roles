@@ -1,7 +1,16 @@
 ---
 
+- name: Assert this architecture has a CloudWatch agent build
+  ansible.builtin.assert:
+    that:
+      - cloudwatch_agent_arch | length > 0
+    fail_msg: >-
+      AWS publishes the agent per architecture and this role knows none for
+      '{{ ansible_facts['architecture'] | default('unknown -- this play gathered no facts') }}'
+      (known: {{ cloudwatch_agent_arch_map.keys() | join(', ') }}).
+
 - name: Ensure agent is installed and up to date
   # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/install-CloudWatch-Agent-commandline-fleet.html
   ansible.builtin.apt:
-    deb: "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+    deb: "{{ cloudwatch_agent_deb_url }}"
   register: agent_package

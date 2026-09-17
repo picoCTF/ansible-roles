@@ -14,3 +14,13 @@
 config_file_path: "/opt/aws/amazon-cloudwatch-agent/config.json"
 
 systemd_unit_dir: "/etc/systemd/system/"
+
+# The agent .deb, by architecture. AWS publishes one per platform under the same
+# path, and apt refuses a package built for another architecture outright ("Wrong
+# architecture 'amd64'"), so a Graviton host needs the arm64 URL rather than a
+# dpkg --add-architecture workaround.
+cloudwatch_agent_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+cloudwatch_agent_arch: "{{ cloudwatch_agent_arch_map[ansible_facts['architecture']] | default('') }}"
+cloudwatch_agent_deb_url: "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/{{ cloudwatch_agent_arch }}/latest/amazon-cloudwatch-agent.deb"
