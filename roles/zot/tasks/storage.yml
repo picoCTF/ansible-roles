@@ -31,7 +31,7 @@
   community.general.filesystem:
     dev: "{{ zot_storage_device }}"
     fstype: xfs
-  when: zot_storage_device
+  when: zot_storage_device | default('', true) | length > 0
 
 - name: Ensure the image store volume is mounted
   ansible.posix.mount:
@@ -40,7 +40,7 @@
     fstype: xfs
     opts: defaults,noatime
     state: mounted
-  when: zot_storage_device
+  when: zot_storage_device | default('', true) | length > 0
 
 - name: Grow the image store filesystem if necessary
   # community.general.filesystem cannot grow XFS filesystems unless they are already
@@ -49,7 +49,7 @@
     dev: "{{ zot_storage_device }}"
     fstype: xfs
     resizefs: yes
-  when: zot_storage_device
+  when: zot_storage_device | default('', true) | length > 0
 
 - name: Ensure the image store is owned by the zot user
   ansible.builtin.file:
