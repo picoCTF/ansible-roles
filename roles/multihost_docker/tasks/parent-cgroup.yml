@@ -49,16 +49,16 @@
 - name: Verify the host is large enough for the configured container capacity
   ansible.builtin.assert:
     that:
-      - (ansible_memtotal_mb | int) - (container_slice_host_reserve_mb | int) >= (container_slice_min_mb | int)
+      - (ansible_facts['memtotal_mb'] | int) - (container_slice_host_reserve_mb | int) >= (container_slice_min_mb | int)
     fail_msg: >-
-      {{ ansible_memtotal_mb }}MiB of RAM less a {{ container_slice_host_reserve_mb | int }}MiB host
+      {{ ansible_facts['memtotal_mb'] }}MiB of RAM less a {{ container_slice_host_reserve_mb | int }}MiB host
       reserve leaves under {{ container_slice_min_mb }}MiB for containers. Lower
       container_slice_target_containers (effective capacity
       {{ container_slice_capacity | int }}) or use a larger instance.
     success_msg: >-
-      {{ (ansible_memtotal_mb | int) - (container_slice_host_reserve_mb | int) }}MiB available to
+      {{ (ansible_facts['memtotal_mb'] | int) - (container_slice_host_reserve_mb | int) }}MiB available to
       {{ parent_cgroup }} for {{ container_slice_capacity | int }} containers
-      ({{ ansible_memtotal_mb }}MiB total less a {{ container_slice_host_reserve_mb | int }}MiB host reserve).
+      ({{ ansible_facts['memtotal_mb'] }}MiB total less a {{ container_slice_host_reserve_mb | int }}MiB host reserve).
 
 - name: Ensure custom container parent cgroup exists
   ansible.builtin.template:

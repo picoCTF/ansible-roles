@@ -17,19 +17,19 @@
 #}
 {% set capacity = container_slice_capacity | int %}
 {% set host_reserve_mb = container_slice_host_reserve_mb | int %}
-{% set slice_max_mb = (ansible_memtotal_mb | int) - host_reserve_mb %}
+{% set slice_max_mb = (ansible_facts['memtotal_mb'] | int) - host_reserve_mb %}
 [Unit]
 Description=Slice limiting combined total resources available to Docker containers
 Before=slices.target
 
 [Slice]
 CPUAccounting=true
-# {{ container_slice_cpu_percent_per_core }}% x {{ ansible_processor_vcpus }} vCPUs. Bounds aggregate container bandwidth;
+# {{ container_slice_cpu_percent_per_core }}% x {{ ansible_facts['processor_vcpus'] }} vCPUs. Bounds aggregate container bandwidth;
 # it reserves nothing for the host, which is what CPUWeight below is for.
-# ansible_processor_vcpus, not ansible_processor_nproc: the latter is the
+# ansible_facts['processor_vcpus'], not ansible_facts['processor_nproc']: the latter is the
 # affinity mask of the Ansible process and would disagree with the `nproc --all`
 # the boot script uses.
-CPUQuota={{ (container_slice_cpu_percent_per_core | int) * (ansible_processor_vcpus | int) }}%
+CPUQuota={{ (container_slice_cpu_percent_per_core | int) * (ansible_facts['processor_vcpus'] | int) }}%
 # Containers lose every scheduler tie against system.slice and user.slice, which
 # stay at the default 100. Without this, sshd and dockerd compete with hundreds
 # of container threads at equal weight and interactive latency collapses long
@@ -37,7 +37,7 @@ CPUQuota={{ (container_slice_cpu_percent_per_core | int) * (ansible_processor_vc
 CPUWeight={{ container_slice_cpu_weight }}
 
 MemoryAccounting=true
-# {{ ansible_memtotal_mb }} MiB total - {{ host_reserve_mb }} MiB host reserve
+# {{ ansible_facts['memtotal_mb'] }} MiB total - {{ host_reserve_mb }} MiB host reserve
 # ({{ container_slice_os_reserve_mb }} OS + {{ container_slice_dockerd_reserve_mb }} dockerd/containerd + {{ container_slice_user_reserve_mb }} user sessions
 #  + {{ container_slice_host_mb_per_container }} x {{ capacity }} shims), leaving ~{{ (slice_max_mb / capacity) | round | int }} MiB per container
 # at the configured capacity.

@@ -1,7 +1,7 @@
 ---
 
 - ansible.builtin.include_tasks: needrestart.yml  # TODO(drop-jammy): remove release gate once jammy is phased out
-  when: ansible_distribution_release == 'noble'
+  when: ansible_facts['distribution_release'] == 'noble'
   args:
     apply:
       become: yes
