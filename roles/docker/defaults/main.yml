@@ -58,7 +58,43 @@ builder_gc_min_docker_version: "28.0.0"
 container_deny_ipv4_cidrs: ["169.254.169.254/32"]
 container_deny_ipv6_cidrs: []
 
-docker_firewall_backend: iptables
+# Which firewall dockerd programs: "nftables" or "iptables".
+#
+# nftables measured ~7x the launch throughput of iptables on this fleet's
+# workload -- the iptables lock serialises dockerd's per-container rule
+# batches -- so it is the default, here as in multihost_docker. Set "iptables"
+# to fall back.
+#
+# This role has a wider spread of hosts than that one: the classroom boxes, the
+# webshell toolboxes and the long-lived challenge servers, not just the build
+# plane. The floor below is what makes one default safe for all of them, and it
+# is a floor on what is INSTALLED, not on the pin -- docker_pin_version is false
+# everywhere, so the pin binds nothing and `upgrade` defaults to no. A host
+# provisioned before 29.6.0 and never touched since fails the assert rather than
+# misconfiguring itself, which is the behaviour to want, but it does mean the
+# play stops there until that host is upgraded.
+#
+# The course boxes reach it later than the rest: they are held stable for the
+# length of a semester rather than re-run, so this takes effect on them at the
+# next deployment, on a fresh host, which is the easy direction to flip in.
+#
+# What differs between the backends, and what the role does about it:
+#   * nftables needs Docker >= docker_nftables_min_version (see vars/main.yml).
+#     The backend arrived in 29.0.0,
+#     but 29.0-29.5 link libnftables and abort once a netlink socket lands on
+#     fd >= 1024 (moby#52873, which containers on user-defined networks reach);
+#     29.6.0 execs the nft binary instead (moby#52886). 28.x reads the setting
+#     and silently keeps programming iptables, so the role asserts the version
+#     actually installed rather than trusting this.
+#   * Docker does not enable net.ipv4.ip_forward on nftables, so the role sets
+#     it. On the iptables backend Docker sets it itself.
+#   * there is no DOCKER-USER chain on nftables, so container_deny_* moves out
+#     of ufw's after.rules and into this role's own nft table. See
+#     tasks/firewall.yml, which moves them in both directions.
+#   * Docker does not tidy up the backend it was using before, so a host
+#     switched in place keeps its old chains, still matching. Flip this on a
+#     fresh instance, or roll the fleet.
+docker_firewall_backend: nftables
 
 docker_reaper_enabled: yes
 docker_reaper_version: "latest"
