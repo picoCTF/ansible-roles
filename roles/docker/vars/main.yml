@@ -35,16 +35,18 @@ docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"
 # Confirm against `apt-cache madison docker-ce` before changing: the epoch and
 # the distribution suffix are part of the version string apt matches on.
 #
-# 28.5.2 is the last release below Docker 29, and the hold is deliberate: this
-# role also serves webshell toolbox hosts, and the original pin task was named
-# "pinned to 28.5.2 (last < 29)". The reason was not recorded at the time --
-# believed to be Docker API compatibility lag in a consumer -- so treat moving
-# it as a change that needs testing rather than a version bump. multihost_docker
-# pins 29.6.0 because its workers need the nftables firewall backend; that
-# decision is scoped to the challenge worker fleet.
+# This was held at 28.5.2, "last < 29", for a reason nobody recorded -- believed
+# to be Docker API compatibility lag in a consumer, and the webshell toolbox
+# hosts this role also serves were the suspected one. They run 29 now, with no
+# such problem, so the hold has outlived whatever it was for and the pin moves
+# up to meet the floor the nftables backend needs.
+#
+# Note this map only applies where docker_pin_version is true, and nothing sets
+# it: every host this role touches installs whatever the repository offers. The
+# pin is what a host gets when it asks to be pinned, not what the fleet runs.
 docker_version_pin_map:
-  jammy: "5:28.5.2-1~ubuntu.22.04~jammy"
-  noble: "5:28.5.2-1~ubuntu.24.04~noble"
+  jammy: "5:29.6.0-1~ubuntu.22.04~jammy"
+  noble: "5:29.6.0-1~ubuntu.24.04~noble"
 
 # The first Docker release whose nftables backend is usable: 29.0.0 introduced
 # it, but only 29.6.0 stopped linking libnftables, which aborts the daemon once
