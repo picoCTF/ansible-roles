@@ -95,24 +95,23 @@ cork_db_wal: null
 cork_enable_disk_quotas: null
 # Where the build path keeps its base image digest pins (CORK_BASE_PINS).
 #
-# The corpus root, deliberately, so the file is COMMITTED to the challenge
-# repository and versioned with the Dockerfiles it pins. cork's own default is
-# <CORK_DIR>/base-pins.json -- which is the same place, but naming it here keeps
-# it explicit. What it must not be is a dotfile nobody commits and a
-# `git clean -xdf` erases, leaving the pins as untracked state on one machine.
-# That matters because losing them is not a no-op: an empty pin map fingerprints
-# differently, so every challenge's next rebuild produces a differently tagged
-# image.
+# Left unset, so cork derives <CORK_DIR>/.base-pins.json and the pins follow the
+# tree. That is the point: the file is COMMITTED to the challenge repository and
+# versioned with the Dockerfiles it pins, so it travels with the corpus rather
+# than belonging to a host. `cork-build --dir` relocates the tree -- a CI runner
+# builds from the checkout in its workspace -- and an absolute path here would
+# go on resolving to the provisioned copy after the tree moved. Pins are an
+# input to every build's content identity, so that does not fail: it
+# refingerprints and rebuilds the corpus under new tags.
 #
-# Committed instead, a base bump is a reviewable diff, a fresh clone restores it,
-# and a rebuilt build plane comes back pinned. It sits outside every challenge
-# directory, so it perturbs no source checksum, and cork's own scan ignores it.
+# A dotfile is safe to commit; `git clean -xdf` does not touch tracked files.
+# Nothing creates it -- `cork-build pins` writes it, dirtying the checkout, so
+# commit the result -- and an absent one means no pinning at all, which is a
+# warning rather than an error.
 #
-# Nothing creates the file; `cork-build pin-refresh` writes it (dirtying the
-# checkout -- commit the result), and an absent one simply means no pinning. Set
-# to null to leave CORK_BASE_PINS unset and take cork's default. Inert on an
-# external daemon, which builds nothing and answers 409 to the pin endpoints.
-cork_base_pins: "{{ cork_dir }}/base-pins.json"
+# Set a path only for a tree that never moves. Inert on an external daemon,
+# which builds nothing and answers 409 to the pin endpoints.
+cork_base_pins: null
 cork_extra_environment_vars: {}
 
 # Build plane only. The yaml mapping destination names to the orchestrators they
