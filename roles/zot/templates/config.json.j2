@@ -6,6 +6,8 @@
   "http": {
     "address": "{{ zot_address }}",
     "port": "{{ zot_port }}",
+    "readTimeout": "{{ zot_read_timeout }}",
+    "writeTimeout": "{{ zot_write_timeout }}",
     "compat": ["docker2s2"],
     "tls": {
       "cert": "{{ zot_config_dir }}/zot-server-cert.pem",

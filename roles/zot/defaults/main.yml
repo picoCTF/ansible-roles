@@ -7,6 +7,30 @@ zot_address: "0.0.0.0"
 zot_port: "5000"
 zot_log_level: "warning"
 
+# HTTP read and write deadlines, as Go duration strings. zot's own default for
+# both is 60s, and that is a deadline on the WHOLE request rather than an idle
+# timeout -- so it bounds how long a single blob may take to transfer, however
+# fast the bytes are moving.
+#
+# 60s is too short for container images. A 2 GB layer has to sustain ~34 MB/s
+# end to end to finish inside it, and a push that does not is cut off mid-body:
+# zot logs
+#
+#   {"message":"unexpected error, removing .uploads/ files",
+#    "error":"read tcp ...: i/o timeout","func":"...PatchBlobUpload"}
+#
+# and the pushing daemon sees "use of closed network connection". docker then
+# retries and fails identically every time, so it reads as a broken registry
+# rather than a deadline. Raising the instance size does not help; the deadline
+# is wall clock.
+#
+# 30m, not 0. Zero disables the deadline entirely, which zot warns leaves it
+# open to stalled connections -- and a bound that no honest push can reach is
+# worth keeping. writeTimeout matters for the other direction, where many
+# workers pull large images at launch.
+zot_read_timeout: "30m"
+zot_write_timeout: "30m"
+
 # Service account zot runs as. Created by the role: a system user with no login shell that
 # owns the image store.
 zot_user: "zot"

@@ -48,6 +48,8 @@ key is handed to the service via systemd `LoadCredential` and read from
 | zot_storage_root | Image store directory. Mount point for `zot_storage_device` when that is set. | `/var/lib/zot` |
 | zot_storage_device | Block device to format as XFS and mount at `zot_storage_root`, e.g. an EBS volume by id. Unset keeps the store on the root filesystem. | unset |
 | zot_log_level | zot log level. | `warning` |
+| zot_read_timeout | `http.readTimeout`, a Go duration. zot defaults both timeouts to 60s, and they bound the **whole request**, not idle time — so 60s caps how long any single blob may take. A 2 GB layer needs ~34 MB/s sustained to fit, and one that does not is cut off mid-body: zot logs an `i/o timeout` in `PatchBlobUpload` and the pusher sees "use of closed network connection". `0` disables the bound entirely. | `30m` |
+| zot_write_timeout | `http.writeTimeout`, the same in the serving direction — many workers pulling large images at launch. | `30m` |
 | zot_deploy_certs | Whether to deploy the three server certs from the controller. | `true` |
 | zot_cert_src | Path **on the Ansible controller** holding `zot-ca-cert.pem`, `zot-server-cert.pem`, `zot-server-key.pem`. | `./docker-certs` |
 
