@@ -54,16 +54,31 @@
   ansible.builtin.set_fact:
     docker_reaper_installation_required: "{{ (not docker_reaper_binary.stat.exists) or (docker_reaper_below_floor | bool) or ((docker_reaper_upgrade | bool) and docker_reaper_version != 'latest' and docker_reaper_probed_version != docker_reaper_version) or ((docker_reaper_upgrade | bool) and docker_reaper_version == 'latest' and docker_reaper_probed_version != docker_reaper_latest_version_response.url.split('/tag/')[1]) }}"
 
+- name: Determine the docker-reaper release to install
+  ansible.builtin.set_fact:
+    docker_reaper_target_version: "{{ docker_reaper_latest_version_response.url.split('/tag/')[1] if docker_reaper_version == 'latest' else docker_reaper_version }}"
+  when: docker_reaper_installation_required | bool
+
 - name: Ensure the docker-reaper to be installed meets the role's floor
   ansible.builtin.assert:
     that:
-      - _target is match('^v?[0-9]+(\.[0-9]+)*$')
-      - (_target | regex_replace('^v', '')) is version(docker_reaper_min_version, '>=')
+      - docker_reaper_target_version is match('^v?[0-9]+(\.[0-9]+)*$')
+      - (docker_reaper_target_version | regex_replace('^v', '')) is version(docker_reaper_min_version, '>=')
     fail_msg: >-
-      This would install docker-reaper {{ _target }}, below {{ docker_reaper_min_version }},
-      the oldest release with every flag the role's unit passes. Publish that release
-      first, or pin docker_reaper_version to one at or above it.
+      This would install docker-reaper {{ docker_reaper_target_version }}, below
+      {{ docker_reaper_min_version }}, the oldest release with every flag the role's unit
+      passes. Publish that release first, or pin docker_reaper_version to one at or above it.
     quiet: yes
-  vars:
-    _target: "{{ docker_reaper_latest_version_response.url.split('/tag/')[1] if docker_reaper_version == 'latest' else docker_reaper_version }}"
+  when: docker_reaper_installation_required | bool
+
+# A release is published before its assets are uploaded, so for a while after one is cut,
+# "latest" names a tag with nothing to download. GitHub answers 302 for an asset that
+# exists and 404 for one that does not; the redirect is not followed.
+- name: Ensure the docker-reaper release has its binary
+  ansible.builtin.uri:
+    url: "{{ docker_reaper_github_url }}/releases/download/{{ docker_reaper_target_version }}/{{ docker_reaper_binary_filename }}"
+    method: HEAD
+    follow_redirects: none
+    status_code: [200, 302]
+  check_mode: false
   when: docker_reaper_installation_required | bool

@@ -96,7 +96,9 @@ docker_reaper_upgrade: no
 docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks"
 # Free space above the threshold has to hold the largest image a worker can pull between two sweeps.
 # --disk-path saves the /info call the reaper otherwise makes on every run to find the data-root.
-docker_reaper_images_command: "images --threshold 89 --target 84 --disk-path {{ docker_data_root }}"
+# --min-size: each removal stalls the worker's creates and pulls until its files are gone, so
+# smaller images are evicted only once no larger one is left.
+docker_reaper_images_command: "images --threshold 89 --target 84 --min-size 100MiB --disk-path {{ docker_data_root }}"
 # Sweeps containerd shims left behind by containers that no longer exist, which
 # otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once
 # its container is absent from the daemon's full container list, so this can never
