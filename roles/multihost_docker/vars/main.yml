@@ -21,6 +21,9 @@ systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"
 systemd_ufw_drop_in_dir: "/etc/systemd/system/ufw.service.d"
 
 storage_mount_point: "/mnt/docker-data"
+# The filesystem dockerd's data-root lives on. userns-remap puts the root itself a
+# <uid>.<gid> directory below this, on the same filesystem.
+docker_data_filesystem: "{{ storage_mount_point if storage_quotas | bool else '/var/lib/docker' }}"
 parent_cgroup: "limit_docker.slice"
 parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
 
