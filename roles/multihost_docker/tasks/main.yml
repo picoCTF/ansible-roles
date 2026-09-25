@@ -1,5 +1,13 @@
 ---
 
+# First, so a docker-reaper release below the role's floor fails the play before the
+# host changes. See the file for why docker-reaper.yml itself is too late.
+- ansible.builtin.include_tasks: docker-reaper-preflight.yml
+  when: docker_reaper_enabled | bool
+  args:
+    apply:
+      become: yes
+
 - ansible.builtin.include_tasks: install.yml
   args:
     apply:

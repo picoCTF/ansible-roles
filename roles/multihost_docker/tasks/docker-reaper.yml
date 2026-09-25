@@ -1,41 +1,7 @@
 ---
 
-# Install docker-reaper and set up systemd service
-
-- name: Check whether docker-reaper is installed
-  ansible.builtin.stat:
-    path: "{{ docker_reaper_install_path }}/docker-reaper"
-  register: docker_reaper_binary
-
-- name: Determine installed docker-reaper version
-  ansible.builtin.command:
-    cmd: "{{ docker_reaper_install_path }}/docker-reaper --version"
-  when: (docker_reaper_upgrade | bool) and docker_reaper_binary.stat.exists
-  register: docker_reaper_version_output
-  changed_when: false
-
-# The probe prints "<name> <version>" and releases are tagged v<version>. It was
-# a shell pipeline through cut, but the task's exit status came from echo rather
-# than the probe -- so a probe that failed reported success and compared as a
-# bare "v", silently forcing a reinstall instead of failing the play.
-- name: Record the installed docker-reaper version
-  ansible.builtin.set_fact:
-    docker_reaper_probed_version: "v{{ (probe | trim).split(' ')[1] if (probe | trim).split(' ') | length > 1 else (probe | trim) }}"
-  vars:
-    probe: "{{ docker_reaper_version_output.stdout | default('') }}"
-  when: (docker_reaper_upgrade | bool) and docker_reaper_binary.stat.exists
-
-- name: Determine latest docker-reaper version
-  ansible.builtin.uri:
-    url: "{{ docker_reaper_github_url }}/releases/latest"
-    method: HEAD
-    follow_redirects: safe
-  register: docker_reaper_latest_version_response
-  when: docker_reaper_version == "latest" and (not docker_reaper_binary.stat.exists or (docker_reaper_upgrade | bool))
-
-- name: Determine whether (re-)installation is necessary
-  ansible.builtin.set_fact:
-    docker_reaper_installation_required: "{{ (not docker_reaper_binary.stat.exists) or ((docker_reaper_upgrade | bool) and docker_reaper_version != 'latest' and docker_reaper_probed_version != docker_reaper_version) or ((docker_reaper_upgrade | bool) and docker_reaper_version == 'latest' and docker_reaper_probed_version != docker_reaper_latest_version_response.url.split('/tag/')[1]) }}"
+# Install docker-reaper and set up systemd service. Whether to install, and what, was
+# decided in docker-reaper-preflight.yml before the role changed anything.
 
 - name: Create temporary directory for download
   ansible.builtin.tempfile:
@@ -70,50 +36,6 @@
     path: "{{ docker_reaper_download_dir.path }}"
     state: absent
   when: docker_reaper_installation_required
-
-# The shims subcommand only exists from a certain release onward, and
-# docker_reaper_upgrade defaults to no, so a worker may still be running an older
-# binary. Rendering the ExecStart unconditionally would fail the unit on every timer
-# tick (the container and image sweeps still run, since shims is ordered last).
-# check_mode: false because ansible.builtin.command is skipped under --check without
-# creates/removes, leaving stdout empty; failed_when: false because this task runs after
-# config.yml has already rewritten daemon.json but before meta: flush_handlers, so an
-# abort here would discard the pending Restart Docker and leave the worker with the new
-# config on disk and the old daemon still running.
-- name: Determine the installed docker-reaper version
-  ansible.builtin.command:
-    cmd: "{{ docker_reaper_install_path }}/docker-reaper --version"
-  register: docker_reaper_installed_version
-  changed_when: false
-  check_mode: false
-  failed_when: false
-  when: docker_reaper_shims_command | default('', true) | length > 0
-
-# The gate stays CLOSED on anything unexpected: a non-zero rc, a task skipped under
-# --check, or a --version output that is not "docker-reaper <version>". The version test
-# RAISES rather than returning false on an unparseable string, so the match guard below
-# must run first -- Jinja's `and` short-circuits, which is what keeps it from ever seeing
-# one. A leading "v" is tolerated because the other version probe in this file adds one.
-- name: Determine whether the installed docker-reaper supports the shim sweep
-  ansible.builtin.set_fact:
-    docker_reaper_shims_supported: >-
-      {{ (docker_reaper_installed_version.rc | default(1)) == 0
-         and _docker_reaper_version is match('^[0-9]+(\.[0-9]+)*$')
-         and _docker_reaper_version is version(docker_reaper_shims_min_version, '>=') }}
-  vars:
-    _docker_reaper_version: >-
-      {{ ((docker_reaper_installed_version.stdout | default('')).split()
-          | last | default('', true)) | regex_replace('^v', '') }}
-  when: docker_reaper_shims_command | default('', true) | length > 0
-
-- name: Warn when the shim sweep is configured but unsupported
-  ansible.builtin.debug:
-    msg: >-
-      docker_reaper_shims_command is set, but the installed docker-reaper reports
-      "{{ docker_reaper_installed_version.stdout | default('') | trim | default('unknown', true) }}",
-      which predates {{ docker_reaper_shims_min_version }}. The shim sweep will be omitted.
-      Apply once with docker_reaper_upgrade=yes to pick up a newer binary.
-  when: docker_reaper_shims_command | default('', true) | length > 0 and not (docker_reaper_shims_supported | default(false) | bool)
 
 - name: Ensure docker_reaper.service systemd unit exists
   ansible.builtin.template:
