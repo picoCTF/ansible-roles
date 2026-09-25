@@ -1,3 +1,4 @@
+{% set lru = docker_reaper_images_lru | bool %}
 [Unit]
 Description=docker-reaper
 Documentation=https://github.com/picoCTF/docker-reaper
@@ -7,10 +8,13 @@ ConditionArchitecture=x86-64
 
 [Service]
 Type=oneshot
-ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_command }}
-ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_images_command }}
-{% if docker_reaper_shims_command and docker_reaper_shims_supported | default(false) | bool %}
-ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_shims_command }}
+{% if lru %}
+StateDirectory=docker-reaper
+{% endif %}
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_command }}{{ (' --record-image-use ' ~ docker_reaper_image_use_record) if lru else '' }}
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_images_command }}{{ (' --lru ' ~ docker_reaper_image_use_record) if lru else '' }}
+{% if docker_reaper_shims_command %}
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_shims_command }} --data-root {{ docker_data_root }}
 {% endif %}
 
 [Install]

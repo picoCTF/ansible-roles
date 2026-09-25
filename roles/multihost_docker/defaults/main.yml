@@ -96,25 +96,23 @@ docker_reaper_upgrade: no
 docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks"
 # Free space above the threshold has to hold the largest image a worker can pull between two sweeps.
 # --disk-path saves the /info call the reaper otherwise makes on every run to find the data-root.
-docker_reaper_images_command: "images --threshold 89 --target 84 --disk-path {{ docker_data_filesystem }}"
+# --min-size: each removal stalls the worker's creates and pulls until its files are gone, so
+# smaller images are evicted only once no larger one is left.
+docker_reaper_images_command: "images --threshold 89 --target 84 --min-size 100MiB --disk-path {{ docker_data_root }}"
 # Sweeps containerd shims left behind by containers that no longer exist, which
 # otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once
 # its container is absent from the daemon's full container list, so this can never
 # shorten a live container's life; min-age only spares shims caught mid-creation.
 # Set to an empty string to disable.
 #
-# Omitted, with a warning, on workers whose docker-reaper predates
-# docker_reaper_shims_min_version. Because docker_reaper_upgrade defaults to no and
-# "latest" only installs when the binary is ABSENT, an already-provisioned worker needs
-# one apply with docker_reaper_upgrade=yes before the sweep does anything at all.
-#
 # A sweep that finds candidates costs settle + (N x grace) -- with docker-reaper's 10s
 # defaults, clearing a large first backlog can hold the oneshot for minutes, during which
 # the container and image sweeps do not run. Harmless (Type=oneshot has no start timeout,
 # and the timer cannot re-trigger an active unit) but worth knowing on first rollout.
 docker_reaper_shims_command: "shims --min-age 5m"
-# First docker-reaper release providing the shims subcommand.
-docker_reaper_shims_min_version: "1.3.0"
+# Evict cached images least recently used first rather than largest first. The container
+# sweep keeps the record from the list it fetches anyway; the image sweep orders by it.
+docker_reaper_images_lru: yes
 docker_reaper_interval_secs: 60
 
 cork_telemetry_enabled: yes

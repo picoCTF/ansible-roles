@@ -21,9 +21,9 @@ systemd_docker_drop_in_dir: "/etc/systemd/system/docker.service.d"
 systemd_ufw_drop_in_dir: "/etc/systemd/system/ufw.service.d"
 
 storage_mount_point: "/mnt/docker-data"
-# The filesystem dockerd's data-root lives on. userns-remap puts the root itself a
-# <uid>.<gid> directory below this, on the same filesystem.
-docker_data_filesystem: "{{ storage_mount_point if storage_quotas | bool else '/var/lib/docker' }}"
+# dockerd's configured data-root. userns-remap puts the daemon's actual root in a
+# <uid>.<gid> directory below it, on the same filesystem.
+docker_data_root: "{{ storage_mount_point if storage_quotas | bool else '/var/lib/docker' }}"
 parent_cgroup: "limit_docker.slice"
 parent_cgroup_path: "/etc/systemd/system/{{ parent_cgroup }}"
 
@@ -37,6 +37,12 @@ oci_interceptor_wrapper_path: "{{ oci_interceptor_install_path }}/oci-intercepto
 docker_reaper_install_path: "/usr/local/bin"
 docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"
 docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"
+# Under the unit's StateDirectory=docker-reaper, which systemd creates.
+docker_reaper_image_use_record: "/var/lib/docker-reaper/image-use"
+# The oldest release with every flag the unit passes (--record-image-use, --lru,
+# --min-size, --data-root); an unknown flag fails the unit and every sweep after it. An older
+# binary is replaced, and the play fails before any change if the replacement is older too.
+docker_reaper_min_version: "1.4.0"
 
 # Confirm against `apt-cache madison docker-ce` before changing: the epoch and
 # the distribution suffix are part of the version string apt matches on.
