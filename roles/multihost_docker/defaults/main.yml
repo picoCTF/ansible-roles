@@ -94,7 +94,8 @@ docker_reaper_enabled: yes
 docker_reaper_version: "latest"
 docker_reaper_upgrade: no
 docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks"
-docker_reaper_images_command: "images --threshold 80 --target 70"
+# Free space above the threshold has to hold the largest image a worker can pull between two sweeps.
+docker_reaper_images_command: "images --threshold 89 --target 84"
 # Sweeps containerd shims left behind by containers that no longer exist, which
 # otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once
 # its container is absent from the daemon's full container list, so this can never
