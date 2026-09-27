@@ -25,6 +25,12 @@
 #     word-splits and glob-expands its arguments.
 {# A bare string would be iterated character by character by map('quote'), producing
    one argv entry per character. dockerd would still start and every container create
-   would then fail, so normalise rather than rendering something that looks valid. #}
-{% set flags = [oci_interceptor_flags] if oci_interceptor_flags is string else oci_interceptor_flags %}
+   would then fail, so normalise rather than rendering something that looks valid.
+
+   The crun selection is appended below rather than carried in oci_interceptor_flags, so
+   overriding that list cannot drop the runtime; crun.yml has already installed and
+   verified that path. It shares this line because a tag on its own line renders a blank
+   one, which would make the wrapper differ from a pre-crun host by whitespace alone and
+   report changed on every apply. #}
+{% set flags = [oci_interceptor_flags] if oci_interceptor_flags is string else oci_interceptor_flags %}{% if crun_enabled | bool %}{% set flags = flags + ['--oi-runtime-path', crun_install_path ~ '/crun'] %}{% endif %}
 exec {{ oci_interceptor_install_path }}/oci-interceptor {{ flags | map('quote') | join(' ') }} "$@"

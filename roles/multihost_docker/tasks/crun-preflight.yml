@@ -1,0 +1,143 @@
+---
+
+# Decides whether crun is installed, and at what version, before the role changes anything.
+# crun.yml runs after install.yml and friends have already touched the host, so a bad pin
+# caught there leaves a half-migrated box; one caught here leaves it as it was. Same reason
+# docker-reaper-preflight.yml is split out, and this file is read-only for the same reason.
+
+# The asset name hardcodes linux-amd64, as the other two binaries this role installs do.
+# Asserted rather than assumed, because get_url would happily place an amd64 binary on an
+# arm64 host and the failure would surface as every container create failing at exec.
+- name: Ensure the host is an architecture the pinned crun asset is built for
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['architecture'] == 'x86_64'
+    fail_msg: >-
+      crun_binary_filename names the linux-amd64 asset, and this host reports
+      {{ ansible_facts['architecture'] }}. Add the matching asset before enabling crun here.
+    quiet: yes
+  when: crun_enabled | bool
+
+- name: Ensure the pinned crun is one the role will install
+  ansible.builtin.assert:
+    that:
+      - crun_version is match('^[0-9]+(\.[0-9]+)*$')
+      - crun_version is version(crun_min_version, '>=')
+      - crun_sha256 is match('^[0-9a-f]{64}$')
+    fail_msg: >-
+      crun_version must be an exact version at or above {{ crun_min_version }} with a
+      64-character crun_sha256 beside it, and is "{{ crun_version }}" /
+      "{{ crun_sha256 }}". There is no "latest" here: this binary creates every container,
+      so the digest is pinned with the version and the two move together.
+    quiet: yes
+  when: crun_enabled | bool
+
+- name: Check whether crun is installed
+  ansible.builtin.stat:
+    path: "{{ crun_install_path }}/crun"
+  register: crun_binary
+  when: crun_enabled | bool
+
+# check_mode: false because a command is skipped under --check, and the floor needs the
+# real version either way.
+- name: Determine installed crun version
+  ansible.builtin.command:
+    cmd: "{{ crun_install_path }}/crun --version"
+  when: (crun_enabled | bool) and (crun_binary.stat.exists | default(false))
+  register: crun_version_output
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# `crun --version` prints "crun version <x.y.z>" first, then commit/rundir/spec lines and a
+# line of build capabilities.
+- name: Record the installed crun version
+  ansible.builtin.set_fact:
+    crun_probed_version: "{{ _crun_probed }}"
+  vars:
+    _crun_probed: >-
+      {{ ((crun_version_output.stdout_lines | default([]) | first | default('')).split()
+          | last | default('', true)) }}
+  when: (crun_enabled | bool) and (crun_binary.stat.exists | default(false))
+
+# Below the floor is replaced whatever crun_upgrade says, because below it means either
+# unusable or knowingly vulnerable: 1.14.1 cannot parse Docker 29's ociVersion at all, and
+# 1.21 is missing the rootfs /dev symlink fixes. A probe that failed, or output that is not
+# a version, counts as below it -- the version test raises on one, so the match comes first.
+- name: Determine whether the installed crun is below the role's floor
+  when: crun_enabled | bool
+  ansible.builtin.set_fact:
+    crun_below_floor: >-
+      {{ (crun_binary.stat.exists | default(false))
+         and not ((crun_version_output.rc | default(1)) == 0
+                  and crun_probed_version is match('^[0-9]+(\.[0-9]+)*$')
+                  and crun_probed_version is version(crun_min_version, '>=')) }}
+
+- name: Determine whether (re-)installation is necessary
+  when: crun_enabled | bool
+  ansible.builtin.set_fact:
+    crun_installation_required: >-
+      {{ (not (crun_binary.stat.exists | default(false)))
+         or (crun_below_floor | bool)
+         or ((crun_upgrade | bool) and crun_probed_version != crun_version) }}
+
+# A release is published before its assets are uploaded, so for a while after one is cut
+# the tag exists with nothing to download. GitHub answers 302 for an asset that exists and
+# 404 for one that does not; the redirect is not followed.
+- name: Ensure the crun release has its binary
+  ansible.builtin.uri:
+    url: "{{ crun_github_url }}/releases/download/{{ crun_version }}/{{ crun_binary_filename }}"
+    method: HEAD
+    follow_redirects: none
+    status_code: [200, 302]
+  check_mode: false
+  when: (crun_enabled | bool) and (crun_installation_required | bool)
+
+# The rest of this file only warns, and only on a host that has been provisioned before:
+# on a fresh box there is no wrapper and no dockerd to ask.
+- name: Check whether the runtime wrapper is already deployed
+  ansible.builtin.stat:
+    path: "{{ oci_interceptor_wrapper_path }}"
+  register: crun_wrapper
+
+- name: Read the deployed runtime wrapper
+  ansible.builtin.slurp:
+    src: "{{ oci_interceptor_wrapper_path }}"
+  register: crun_wrapper_content
+  when: crun_wrapper.stat.exists
+
+- name: Count running containers on this host
+  ansible.builtin.command:
+    cmd: docker ps --quiet
+  register: crun_running_containers
+  when: crun_wrapper.stat.exists
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# Swapping the runtime under a live container costs that container its graceful stop: a
+# container is killed by the runtime that created it, so `crun kill <id> 15` fails on the
+# state runc wrote (and the reverse fails the same way). SIGTERM never arrives and dockerd
+# SIGKILLs after the full timeout. Measured on Docker 29.8.1 -- 277ms and exit 0 before,
+# 12.1s and exit 137 after. Warned rather than enforced, because a worker the operator has
+# already drained is the normal case and must not fail.
+#
+# Deliberately checks BOTH directions and is not gated on crun_enabled: turning it off
+# strands crun-created containers exactly as turning it on strands runc-created ones, and
+# that is the run on which the wrapper already carries the flag.
+- name: Warn when this apply would change the runtime under running containers
+  ansible.builtin.debug:
+    msg: >-
+      This host has {{ _crun_running | int }} running container(s) and this apply switches
+      their runtime from {{ 'crun to runc' if _crun_wrapper_has_crun | bool else 'runc to crun' }}.
+      A container is killed by the runtime that created it, so each of them loses its
+      graceful stop: SIGTERM never arrives, the stop runs to the full timeout and ends in
+      SIGKILL. Drain the worker and re-apply. See "crun replaces runc" in MIGRATION.md.
+  vars:
+    _crun_running: "{{ (crun_running_containers.stdout_lines | default([])) | length }}"
+    _crun_wrapper_has_crun: >-
+      {{ '--oi-runtime-path' in (crun_wrapper_content.content | default('') | b64decode) }}
+  when:
+    - crun_wrapper.stat.exists
+    - (_crun_wrapper_has_crun | bool) != (crun_enabled | bool)
+    - (_crun_running | int) > 0

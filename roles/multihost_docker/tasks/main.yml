@@ -8,6 +8,16 @@
     apply:
       become: yes
 
+# Likewise: a crun pin below the floor, or an architecture with no asset, fails here rather
+# than seven includes later once the host has been changed. Not gated on crun_enabled,
+# because the drain warning at the end has to fire when it is being turned OFF too -- that
+# direction strands crun-created containers exactly the same way.
+- ansible.builtin.include_tasks: crun-preflight.yml
+  when: oci_interceptor_enabled | bool
+  args:
+    apply:
+      become: yes
+
 - ansible.builtin.include_tasks: install.yml
   args:
     apply:
@@ -30,6 +40,14 @@
       become: yes
 
 - ansible.builtin.include_tasks: parent-cgroup.yml
+  args:
+    apply:
+      become: yes
+
+# Before oci-interceptor.yml, which writes the wrapper naming the crun binary. The
+# decisions this acts on were all made in crun-preflight.yml.
+- ansible.builtin.include_tasks: crun.yml
+  when: (oci_interceptor_enabled | bool) and (crun_enabled | bool)
   args:
     apply:
       become: yes

@@ -34,6 +34,17 @@ oci_interceptor_binary_filename: "oci-interceptor_x86_64-unknown-linux-gnu.tar.g
 # can be applied without daemon.json runtimeArgs. See the template for why.
 oci_interceptor_wrapper_path: "{{ oci_interceptor_install_path }}/oci-interceptor-runtime"
 
+crun_install_path: "/usr/local/bin"
+crun_github_url: "https://github.com/containers/crun"
+# Release assets are statically linked raw binaries, not archives, so nothing is unpacked.
+# amd64 only, as the other two binaries this role installs already are.
+crun_binary_filename: "crun-{{ crun_version }}-linux-amd64"
+# Upstream only, never the distro archive: noble ships 1.14.1, which rejects Docker 29's
+# ociVersion outright, and resolute ships 1.21 from universe, four CVE fixes behind --
+# including the rootfs /dev symlink family, reachable on a challenge whose rootfs is
+# writable (readonlyrootfs is opt-in) and whose instance gets restarted.
+crun_min_version: "1.30.1"
+
 docker_reaper_install_path: "/usr/local/bin"
 docker_reaper_github_url: "https://github.com/picoCTF/docker-reaper"
 docker_reaper_binary_filename: "docker-reaper-x86_64-unknown-linux-gnu.tar.gz"

@@ -116,6 +116,112 @@ wrapper (shell-quoted) rather than into `daemon.json`.
 containers keep working and the leak only surfaces as memory pressure days later. An
 absent or empty `runtimeArgs` produces no generated wrapper; a non-empty one does.
 
+### crun as the runtime
+
+With `crun_enabled` (the default), the wrapper passes `--oi-runtime-path` so the
+interceptor `exec`s **crun** rather than `runc`. Measured on a 2 vCPU worker with a real
+challenge image, launch = network create plus container create and start:
+
+| concurrency | runc | crun | throughput |
+| --- | --- | --- | --- |
+| 1 | 178.1 ms | 150.3 ms | 1.18x |
+| 2 | 209.7 ms | 168.7 ms | 1.25x |
+| 4 | 332.0 ms | 296.7 ms | 1.12x |
+| 8 | 628.5 ms | 528.1 ms | 1.19x |
+
+The gain **persists** under load rather than eroding, which is the part worth knowing: the
+expectation going in was that queueing would swallow it, and it does not — 1.12x to 1.25x
+at every level tested, with the largest absolute saving at P=8. crun removes serial CPU
+work per launch and CPU is the contended resource, so the saving survives contention rather
+than being hidden by it. The ratio is not monotonic in concurrency and the table is the
+authority. Teardown improves too once the host is short of CPU (491 ms to 425 ms at P=8).
+
+It is a runtime swap, not a behaviour change. The container's kernel-visible state is
+identical to runc's — capabilities, seccomp filter, rlimits, namespaces, apparmor, cgroup
+limits, `/dev`, and the `(ret, errno)` of 56 syscalls chosen for what gates them — across
+writable and read-only rootfs and with `userns-remap` both on and off. Only the mount
+table differs, and only in ways where crun is equal or stricter (masked `/proc` files `ro`
+where runc leaves them `rw`, `noexec` added on the `/dev` character-device binds).
+
+That comparison was run on a host in this role's own shape — `userns-remap`,
+`cgroup-parent: limit_docker.slice` and `native.cgroupdriver=systemd` — which matters,
+because those are the three things crun implements independently of runc. cork's e2e suite
+also passes 57/57 on crun, including the seccomp and multi-container steps, but note its
+fleet runs cgroupfs with no userns remap and no cgroup parent, so the e2e is functional
+coverage and the state comparison is the configuration coverage. Neither alone is enough.
+
+#### How that was checked, and what to watch
+
+containerd hands both runtimes the *same* OCI spec, so a syscall's outcome follows from the
+state the runtime built — which makes comparing that state stronger than sampling
+behaviour: if it matches, there is no mechanism left to diverge. State was read from the
+**host's** `/proc/<pid>/…`, so nothing went through either runtime's own `exec`, and
+compared section by section: capability sets, seccomp mode and filter count, 16 rlimits,
+namespaces, apparmor, `oom_score_adj`, the cgroup limits in force, `/dev`.
+
+A probe inside the container then invoked **56 syscalls**, recording `(ret, errno)` for
+each, under both runtimes in four configurations — writable and read-only rootfs,
+`userns-remap` on and off. Every line matched. Zero arguments are passed on purpose:
+seccomp rejects on the syscall number before the kernel sees arguments, so the pair is
+decided by the container's configuration either way. The 56 were picked for what gates
+them — the seccomp-denied set (`mount`, `umount2`, `pivot_root`, `setns`, `unshare`, `bpf`,
+`perf_event_open`, the `*_module` family, `iopl`, `swapon`, `reboot`, the clock setters,
+`quotactl`, `syslog`), the capability-gated set (`setuid`, `capset`, `sethostname`,
+`mlock`), and the keyring and NUMA calls.
+
+Zero arguments cannot reach the rules that filter *on* arguments, so those were probed
+separately against cork's own `default.json`, `execstack.json` and `no-ptrace.json`: all
+nine arg-filtered rules (`socket` on domain, five `personality` equalities plus a
+`MASKED_EQ`, two `clone` masks) behaved identically under both runtimes. That includes the
+one bit that distinguishes two of the profiles — `READ_IMPLIES_EXEC` is denied under
+`default.json` and allowed under `execstack.json`, and both runtimes agree on both — which
+is worth knowing because the two link different libseccomp versions (runc 2.5.5, crun
+2.6.1) and `MASKED_EQ` is the subtlest operator we ship.
+
+If someone raises "crun applies a stricter default profile, blocking `io_setup` or some
+`ioctl`s": that describes podman, which supplies its own default from containers-common.
+Under Docker the profile comes from the daemon and the runtime only applies it. Measured
+under cork's profiles, `io_setup`, `io_submit`, `io_destroy`, `io_getevents` and every
+`ioctl` request tried (including `TIOCSTI`) reach the kernel rather than returning EPERM,
+identically under both. `io_uring_setup` *is* denied — by our profile, which does not list
+it, again identically under both.
+
+Worth re-checking on a crun **major** bump (a patch release does not warrant a re-run):
+
+- **Syscalls a profile does not list** — `clone3`, `openat2`, `io_uring_setup`,
+  `landlock_create_ruleset`, `memfd_secret`. Handling of an unrecognised name is the classic
+  runc/crun divergence; checked directly, and both skip it and keep the container.
+- **`ptrace`**, because cork's no-ptrace profile means gdb-shaped challenges depend on the
+  widened profile arriving intact; and **`personality`**, because `execstack` only yields its
+  flag with `READ_IMPLIES_EXEC` permitted, making it a good end-to-end canary.
+- **`mount`, `unshare`, `setns`** — divergence here would be a security difference rather
+  than a compatibility one.
+
+Two things to know about the pin:
+
+- **It is upstream, never the distro archive, and there is no `latest`.** noble ships
+  1.14.1, which cannot parse Docker 29's `ociVersion` at all; resolute ships 1.21 from
+  *universe*, which is four CVE fixes behind and outside Canonical's standard security
+  maintenance. `crun_version` and `crun_sha256` are pinned together and verified on
+  download, because this binary creates every container.
+- **`crun_min_version` is enforced, not advisory.** An installed binary below it is
+  replaced whatever `crun_upgrade` says, and a pin below it fails the play before the host
+  changes. Below the floor means unusable (1.14.1) or knowingly vulnerable (1.21 is missing
+  the rootfs `/dev` symlink fixes, reachable on a challenge whose rootfs is writable —
+  `readonlyrootfs` is opt-in — and whose instance gets restarted).
+
+**Drain the worker before the apply that flips this.** A new runtime takes effect on the
+next container without a daemon restart, which sounds like running challenges are left
+alone, and they are not: a container is killed by the runtime that created it, so
+`crun kill <id> 15` fails on the state runc wrote. SIGTERM never arrives, dockerd waits out
+the whole stop timeout and then SIGKILLs. Measured on Docker 29.8.1 — a graceful stop is
+277 ms and exit 0 before the swap, 12.1 s and exit 137 after. cork's stop wait is bounded
+(`CORK_WORKER_TEARDOWN_WAIT`) and the platform treats a timed-out stop as done, so the
+visible symptom is teardowns queueing and being refused rather than an error. Setting
+`crun_enabled: no` strands crun-created containers the same way. The role warns when it
+sees running containers and a wrapper that does not select crun yet; it does not refuse,
+because an already-drained worker is the normal case.
+
 Note that changing either file restarts `dockerd`, which stops running containers
 (`live-restore` is not enabled). Drain a worker before applying.
 
@@ -467,6 +573,10 @@ fstab line by hand if you actually want it gone.
 | `oci_interceptor_upgrade` | Whether to upgrade `oci-interceptor` if already installed. | `false` |
 | `oci_interceptor_flags` | Flags to pass to `oci-interceptor`. Must be a **list**; they are rendered shell-quoted into the runtime wrapper rather than into `daemon.json`. | `["--oi-readonly-networking-mounts"]` |
 | `oci_interceptor_min_version` | Lowest oci-interceptor version that `exec`s the runtime rather than spawning it. Below this the role warns on every apply: the runtime wrapper alone does not stop shims leaking. Not enforced, since an older binary otherwise works. | `0.3.0` |
+| `crun_enabled` | Whether the interceptor `exec`s `crun` instead of `runc`, via `--oi-runtime-path` in the wrapper. Requires `oci_interceptor_enabled`. | `true` |
+| `crun_version` | Exact crun version to install. There is no `latest`: it is pinned with `crun_sha256` and the two move together. Must be at or above the role's floor, `crun_min_version` in `vars/main.yml` (1.30.1) — an older installed binary is replaced whatever `crun_upgrade` says, and a pin below it fails the play before the host changes. | `1.30.1` |
+| `crun_sha256` | SHA-256 of the pinned release asset, verified on download before it is moved into place. | digest of 1.30.1 |
+| `crun_upgrade` | Whether to replace an already-installed crun that is at or above the floor but not at `crun_version`. | `no` |
 
 ### Logging settings
 

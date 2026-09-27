@@ -1,0 +1,69 @@
+---
+
+# Installs crun, the OCI runtime the interceptor execs in place of runc. Everything that
+# decides whether to install, and refuses a bad pin, is in crun-preflight.yml, which runs
+# before the role changes anything.
+#
+# Runs before oci-interceptor.yml, which writes the wrapper naming this binary: a wrapper
+# pointing at a missing runtime fails every container create. Nothing here notifies a
+# restart -- dockerd records only the wrapper path, and the kernel reads the wrapper at
+# every exec. That is also why the runtime must never change under a running container;
+# see crun-preflight.yml and MIGRATION.md.
+
+- name: Install crun
+  when: crun_installation_required | bool
+  block:
+    # Staged beside the destination rather than in a temp dir: same filesystem, so the
+    # move below is a rename, and /tmp mounted noexec cannot stop the verification.
+    - name: Download crun beside its install location
+      ansible.builtin.get_url:
+        url: "{{ crun_github_url }}/releases/download/{{ crun_version }}/{{ crun_binary_filename }}"
+        dest: "{{ crun_install_path }}/.crun.new"
+        checksum: "sha256:{{ crun_sha256 }}"
+        mode: "0755"
+        owner: root
+        group: root
+
+    # Verified before it replaces a working runtime, not after: a digest-correct asset can
+    # still be the wrong build, and a host whose wrapper already names this path would fail
+    # every container create until someone noticed. +SYSTEMD because production sets
+    # native.cgroupdriver=systemd and a cgroup-parent slice, which upstream's
+    # -disable-systemd asset cannot honour -- and it passes both digest and version checks.
+    - name: Verify the downloaded crun runs, meets the floor and can drive systemd cgroups
+      ansible.builtin.command:
+        cmd: "{{ crun_install_path }}/.crun.new --version"
+      register: crun_verify
+      changed_when: false
+      check_mode: false
+      failed_when: >-
+        crun_verify.rc != 0
+        or not (_crun_new_version is match('^[0-9]+(\.[0-9]+)*$'))
+        or not (_crun_new_version is version(crun_min_version, '>='))
+        or '+SYSTEMD' not in crun_verify.stdout
+      vars:
+        _crun_new_version: >-
+          {{ ((crun_verify.stdout_lines | default([]) | first | default('')).split()
+              | last | default('', true)) }}
+      when: not ansible_check_mode
+
+    - name: Report the crun that would be verified under --check
+      ansible.builtin.debug:
+        msg: >-
+          Skipping the crun verification: get_url does not write
+          {{ crun_install_path }}/.crun.new under --check, so there is nothing to run.
+          A real apply installs crun {{ crun_version }} and fails unless it reports a
+          version at or above {{ crun_min_version }} with +SYSTEMD.
+      when: ansible_check_mode
+
+    # Same directory, so this is a rename: no window in which the path is absent or partial.
+    - name: Move the verified crun into place
+      ansible.builtin.command:
+        cmd: "mv -f {{ crun_install_path }}/.crun.new {{ crun_install_path }}/crun"
+      changed_when: true
+      when: not ansible_check_mode
+
+  always:
+    - name: Remove the staged crun if it is still there
+      ansible.builtin.file:
+        path: "{{ crun_install_path }}/.crun.new"
+        state: absent
