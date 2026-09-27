@@ -25,6 +25,12 @@
 #     word-splits and glob-expands its arguments.
 {# A bare string would be iterated character by character by map('quote'), producing
    one argv entry per character. dockerd would still start and every container create
-   would then fail, so normalise rather than rendering something that looks valid. #}
+   would then fail, so normalise rather than rendering something that looks valid.
+
+   multihost_docker's copy of this template also appends --oi-runtime-path to select crun.
+   Deliberately not here: challenge containers run under that role, and this one installs
+   no crun, so naming one would point dockerd at a binary that does not exist. Kept in this
+   comment block rather than a second one, because a block of its own renders a blank line
+   and every apply would then report the wrapper as changed. #}
 {% set flags = [oci_interceptor_flags] if oci_interceptor_flags is string else oci_interceptor_flags %}
 exec {{ oci_interceptor_install_path }}/oci-interceptor {{ flags | map('quote') | join(' ') }} "$@"

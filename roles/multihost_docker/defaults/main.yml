@@ -54,7 +54,22 @@ oci_interceptor_upgrade: no
 # the runtime wrapper still leaves one non-exec layer and shims keep leaking; the role
 # warns but does not fail, since an older binary works fine otherwise.
 oci_interceptor_min_version: "0.3.0"
+# The interceptor's own flags. The crun selection is appended by the wrapper template from
+# crun_enabled, so overriding this list cannot silently drop the runtime.
 oci_interceptor_flags: ["--oi-readonly-networking-mounts"]
+
+# crun instead of runc beneath the interceptor: 1.12-1.25x launch throughput on a 2 vCPU
+# worker, holding at every concurrency tested. Flipping this changes the runtime under any
+# running container, which costs it its graceful stop -- drain first, see README.
+crun_enabled: yes
+# Pinned with its digest, and deliberately no "latest": this binary creates every
+# container. Move the two together, and see crun_min_version for why not the distro's.
+crun_version: "1.30.1"
+crun_sha256: "86d1e6a0e76945975d3aebfab39cbc6a26eea15f1c3fc66b6776d19e5dc346a0"
+# As with the other binaries, an existing install is left alone unless this is set -- but a
+# version below crun_min_version is replaced regardless, since below it is unusable or
+# knowingly vulnerable.
+crun_upgrade: no
 
 logs_max_size: "10m"
 logs_max_files: 3

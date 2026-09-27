@@ -10,6 +10,38 @@ you have to do.
 
 ---
 
+## crun replaces runc as the runtime the interceptor execs
+
+**Affects** `multihost_docker` · **Action required: drain each worker before applying, or
+accept that every container already running on it loses its graceful stop**
+
+`crun_enabled` defaults to `yes`, so the next apply installs crun and rewrites the runtime
+wrapper to pass `--oi-runtime-path`. It buys 1.12x–1.25x launch throughput on a 2 vCPU
+worker, holding at every concurrency tested, and the container's kernel-visible state is
+identical to runc's — see "crun as the runtime" in the role README for the measurements and
+the comparison.
+
+The part that needs you is the transition, not the destination. A new runtime takes effect
+on the next container with no daemon restart, so it looks like running containers are
+untouched. They are not: a container is killed by the runtime that created it, and
+`crun kill <id> 15` fails on state runc wrote. SIGTERM never arrives, dockerd waits out the
+full stop timeout and then SIGKILLs. Measured on Docker 29.8.1, a graceful stop goes from
+277 ms and exit 0 to **12.1 s and exit 137**. The containers are not stranded — `stop` and
+`rm` still succeed — so nothing errors; cork's stop wait is bounded and the platform treats
+a timed-out stop as done, which means the symptom is teardowns queueing and being refused,
+attributed to the wrong thing.
+
+So: drain, apply, return the worker to the fleet. The role warns when it finds running
+containers and a wrapper that does not select crun yet, and does not refuse, because an
+already-drained worker is the normal case.
+
+Setting `crun_enabled: no` later has the same hazard in reverse, and needs the same drain.
+
+`roles/docker` is deliberately untouched — challenge containers run under
+`multihost_docker`, and that role's wrapper template carries a note saying so.
+
+---
+
 ## Worker data volumes are mounted by label, so a worker can be cloned
 
 **Affects** `multihost_docker` · **Action required: re-run the role on every worker, then
