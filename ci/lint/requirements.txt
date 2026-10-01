@@ -5,5 +5,5 @@
 #
 # Dependabot opens the bumps (see .github/dependabot.yml). Expect the report to
 # change when you merge one; that is the point of seeing it in a PR.
-ansible-lint==26.8.0
+ansible-lint==26.9.0
 ansible-core==2.21.4
