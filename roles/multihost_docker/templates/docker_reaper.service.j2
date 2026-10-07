@@ -12,7 +12,7 @@ Type=oneshot
 StateDirectory=docker-reaper
 {% endif %}
 ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_command }}{{ (' --record-image-use ' ~ docker_reaper_image_use_record) if lru else '' }}
-ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_images_command }}{{ (' --lru ' ~ docker_reaper_image_use_record) if lru else '' }}
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_images_command }}{{ (' --lru ' ~ docker_reaper_image_use_record ~ ((' --stale-after ' ~ docker_reaper_images_stale_after) if docker_reaper_images_stale_after else '')) if lru else '' }}
 {% if docker_reaper_shims_command %}
 ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_shims_command }} --data-root {{ docker_data_root }}
 {% endif %}

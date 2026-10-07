@@ -109,11 +109,13 @@ docker_reaper_enabled: yes
 docker_reaper_version: "latest"
 docker_reaper_upgrade: no
 docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30m --reap-networks"
-# Free space above the threshold has to hold the largest image a worker can pull between two sweeps.
+# Free space above the threshold has to hold what a worker can pull between two sweeps; with
+# large images kept, 7% of a 75 GB volume covers the largest first pull. The gap down to the
+# target must outlast container data's daily swing (~2 points), or peaks alone evict images.
 # --disk-path saves the /info call the reaper otherwise makes on every run to find the data-root.
-# --min-size: each removal stalls the worker's creates and pulls until its files are gone, so
-# smaller images are evicted only once no larger one is left.
-docker_reaper_images_command: "images --threshold 89 --target 84 --min-size 100MiB --disk-path {{ docker_data_root }}"
+# --max-size: images that would free more are the slow re-pulls, so they go only once nothing
+# else is left.
+docker_reaper_images_command: "images --threshold 93 --target 88 --max-size 512MiB --disk-path {{ docker_data_root }}"
 # Sweeps containerd shims left behind by containers that no longer exist, which
 # otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once
 # its container is absent from the daemon's full container list, so this can never
@@ -128,6 +130,10 @@ docker_reaper_shims_command: "shims --min-age 5m"
 # Evict cached images least recently used first rather than largest first. The container
 # sweep keeps the record from the list it fetches anyway; the image sweep orders by it.
 docker_reaper_images_lru: yes
+# With the LRU record, an image unused this long goes by age alone, whatever its size; without
+# it, --max-size would keep a replaced build until nothing smaller is left. A week, as
+# challenges rarely change; Go-style durations have no d or w unit. Empty disables.
+docker_reaper_images_stale_after: "168h"
 docker_reaper_interval_secs: 60
 
 cork_telemetry_enabled: yes
