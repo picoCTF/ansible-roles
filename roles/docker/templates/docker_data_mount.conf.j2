@@ -1,0 +1,17 @@
+# dockerd's data-root is on the separate XFS volume (see daemon.json), and
+# nothing else connects the two. Without this, a data volume that fails to mount
+# leaves dockerd running perfectly happily on a directory of the same name on the
+# root volume: a fraction of the space, and no XFS project quotas, which is the
+# entire reason the volume exists. Nothing reports it. The first sign is a build
+# filling the root disk.
+#
+# It is the other half of nofail in storage_mount_options. Without nofail the
+# failure lands on local-fs.target and the host never gets far enough to refuse
+# anything, or to be logged into; with nofail and without this, it degrades
+# silently. Together they give the only useful outcome: the host boots, dockerd
+# refuses to start, and someone can get in and see why.
+#
+# multihost_docker carries the same drop-in for the same reason, and its copy
+# documents what Requires= does and does not propagate.
+[Unit]
+RequiresMountsFor={{ storage_mount_point }}

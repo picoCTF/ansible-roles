@@ -3,18 +3,103 @@
 # Use a separate XFS volume for Docker graph storage in order
 # to enable volume/writable layer storage quotas
 
+# The volume is found by device and mounted thereafter by filesystem UUID.
+# storage_device is only used to format, read and grow it; fstab names the UUID.
+# That is what makes an image of this host clonable: the by-id path AWS gives an
+# EBS volume is built from the volume ID, and a snapshot restores to a new volume
+# with a new ID, so an image whose fstab named a device comes up with a correct,
+# fully populated filesystem that nothing mounts. A UUID lives in the filesystem
+# superblock, so a block-level snapshot carries it along with everything else.
+#
+# multihost_docker does the same with a label and documents the reasoning at
+# length; this file follows it, and the notes below mark where the two differ.
+
 - name: Ensure Docker data volume is formatted as XFS
   community.general.filesystem:
     dev: "{{ storage_device }}"
     fstype: xfs
 
+- name: Read the Docker data volume's filesystem UUID
+  # -c /dev/null bypasses blkid's cache, which can still name a volume that has
+  # been replaced.
+  ansible.builtin.command:
+    argv: ["blkid", "-c", "/dev/null", "-s", "UUID", "-o", "value", "{{ storage_device }}"]
+  register: docker_storage_uuid
+  changed_when: false
+
+- name: Fail rather than write an fstab entry with no UUID
+  # An empty read becomes "UUID=" in fstab, which leaves the volume unmounted at
+  # the next boot rather than now.
+  ansible.builtin.assert:
+    that:
+      - docker_storage_uuid.stdout | trim is match('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+    fail_msg: >-
+      blkid read no filesystem UUID from {{ storage_device }}
+      (got {{ docker_storage_uuid.stdout | trim | default('nothing', true) }}).
+      Writing that to fstab would leave {{ storage_mount_point }} unmounted at
+      the next boot, so the play stops here instead.
+
+# Asked live rather than read from ansible_facts['mounts'], which is a snapshot
+# from play start. It decides whether this is a fresh provision or a host that is
+# already serving.
+- name: Check whether the Docker data volume is mounted
+  ansible.builtin.command:
+    argv: ["findmnt", "-no", "TARGET", "{{ storage_mount_point }}"]
+  register: storage_mounted
+  changed_when: no
+  # 1 is findmnt's only failure code and covers "not a mount point", which is
+  # the fresh-provision case.
+  failed_when: storage_mounted.rc not in [0, 1]
+  check_mode: false
+
+- name: Ensure the Docker data volume is recorded in fstab, by UUID
+  # Deliberately "present" rather than "mounted". ansible.posix.mount's remount
+  # falls through to `umount` and then a fresh `mount` when the remount fails,
+  # and the guard that would refuse instead only applies to state: remounted. The
+  # fstab text does change on the migration run (device -> UUID=), so an
+  # unconditional state: mounted would issue a remount against dockerd's
+  # data-root with that fallback armed behind it.
+  #
+  # The entry takes effect at the next boot, which for an image baked from this
+  # host is the only boot that matters.
+  ansible.posix.mount:
+    path: "{{ storage_mount_point }}"
+    src: "UUID={{ docker_storage_uuid.stdout | trim }}"
+    fstype: xfs
+    opts: "{{ storage_mount_options }}"
+    state: present
+  # ansible.posix.mount writes fstab and nothing else; the unit systemd derives
+  # from it is only regenerated on a daemon-reload. Without this a run that
+  # changes the entry leaves systemd holding a unit naming the old device, and
+  # docker.service -- which now requires that mount -- refuses to start at the
+  # next restart.
+  notify:
+    - Reload systemd config
+
 - name: Ensure the Docker data volume is mounted
   ansible.posix.mount:
     path: "{{ storage_mount_point }}"
-    src: "{{ storage_device }}"
+    src: "UUID={{ docker_storage_uuid.stdout | trim }}"
     fstype: xfs
-    opts: pquota
+    opts: "{{ storage_mount_options }}"
     state: mounted
+  when: storage_mounted.rc != 0
+
+# nofail cuts both ways. It is what keeps an unresolvable UUID off the boot path,
+# but mount(8) reads it as "do not report errors for this device if it does not
+# exist" -- so when UUID= does not resolve, `mount` exits 0 having mounted
+# nothing and the task above reports success. Nothing later notices: the grow
+# task answers from the device with xfs_info and never looks for a mount point.
+# Without this the run is green while storage_mount_point is an empty directory
+# on the root disk and daemon.json is about to name it as data-root.
+- name: Confirm something is now mounted at the data volume's mount point
+  ansible.builtin.command:
+    argv: ["findmnt", "-no", "TARGET", "{{ storage_mount_point }}"]
+  register: storage_mounted_after
+  changed_when: no
+  failed_when: storage_mounted_after.rc != 0
+  check_mode: false
+  when: not ansible_check_mode
 
 - name: Grow the filesystem if necessary
   # community.general.filesystem cannot grow XFS filesystems unless they are already

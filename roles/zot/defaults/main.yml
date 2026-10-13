@@ -41,5 +41,11 @@ zot_user: "zot"
 zot_storage_root: "/var/lib/zot"
 zot_storage_device: null
 
+# nofail keeps a volume that will not mount off local-fs.target, so the host boots
+# and can be logged into. Safe only because zot.service requires the mount, so an
+# unmounted store stops zot rather than letting it serve an empty one from the
+# root filesystem.
+zot_storage_mount_options: "defaults,noatime,nofail,x-systemd.device-timeout=30s"
+
 zot_deploy_certs: yes
 zot_cert_src: "./docker-certs"
