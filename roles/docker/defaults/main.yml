@@ -14,6 +14,13 @@ tls_fetched_cert_path: "./fetched/certs"
 storage_quotas: yes
 storage_device: "/dev/nvme1n1"
 
+# nofail keeps a volume that will not mount off local-fs.target, so the host boots
+# and can be logged into instead of dropping to an emergency shell no locked root
+# account can reach. It is only safe paired with the RequiresMountsFor drop-in
+# (templates/docker_data_mount.conf.j2), which stops dockerd running on the root
+# filesystem in its place.
+storage_mount_options: "pquota,nofail,x-systemd.device-timeout=30s"
+
 network_ip_pools: ["192.168.0.0/16"]
 network_prefix_length: 29
 

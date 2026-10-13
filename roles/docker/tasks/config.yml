@@ -20,6 +20,27 @@
     - Reload systemd config
     - Restart Docker
 
+# Deliberately no "Restart Docker": a dependency takes effect at the next start
+# of docker.service, and restarting to apply it would kill whatever is running
+# for no benefit.
+- name: Ensure docker.service requires the data volume mount
+  ansible.builtin.template:
+    src: "docker_data_mount.conf.j2"
+    dest: "{{ systemd_docker_drop_in_dir }}/20-data-volume.conf"
+    force: yes
+    mode: "0644"
+  when: storage_quotas | bool
+  notify:
+    - Reload systemd config
+
+- name: Ensure docker.service requires no mount when there is no data volume
+  ansible.builtin.file:
+    path: "{{ systemd_docker_drop_in_dir }}/20-data-volume.conf"
+    state: absent
+  when: not (storage_quotas | bool)
+  notify:
+    - Reload systemd config
+
 # Ordering only: docker_cgroup_quota.service is Before=docker.service, but nothing
 # pulls it in, so a manual `systemctl restart docker` or socket activation could
 # bring dockerd up ahead of the cgroup ceilings. Deliberately does NOT notify

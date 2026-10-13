@@ -43,7 +43,7 @@
     path: "{{ storage_mount_point }}"
     src: "UUID={{ docker_storage_uuid.stdout | trim }}"
     fstype: xfs
-    opts: pquota
+    opts: "{{ storage_mount_options }}"
     state: mounted
 
 - name: Grow the filesystem if necessary

@@ -4,6 +4,12 @@ Documentation=https://zotregistry.dev
 After=network-online.target
 Wants=network-online.target
 
+# The store may be a separately mounted volume, and nothing else connects the two:
+# without this, a volume that failed to mount would leave zot serving an empty
+# store from the root filesystem and accepting pushes into it. Resolves to the
+# root mount, and so is a no-op, when there is no dedicated volume.
+RequiresMountsFor={{ zot_storage_root }}
+
 [Service]
 ExecStart={{ zot_install_path }} serve {{ zot_config_dir }}/config.json
 Restart=always

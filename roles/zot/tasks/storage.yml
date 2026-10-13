@@ -67,7 +67,7 @@
     path: "{{ zot_storage_root }}"
     src: "UUID={{ zot_storage_uuid.stdout | trim }}"
     fstype: xfs
-    opts: defaults,noatime
+    opts: "{{ zot_storage_mount_options }}"
     state: mounted
   when: zot_storage_device | default('', true) | length > 0
 
