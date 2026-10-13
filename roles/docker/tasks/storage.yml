@@ -3,15 +3,45 @@
 # Use a separate XFS volume for Docker graph storage in order
 # to enable volume/writable layer storage quotas
 
+# The volume is found by device and mounted thereafter by filesystem UUID.
+# storage_device is only used to format, read and grow it; fstab names the UUID.
+# That is what makes an image of this host clonable: the by-id path AWS gives an
+# EBS volume is built from the volume ID, and a snapshot restores to a new volume
+# with a new ID, so an image whose fstab named a device comes up with a correct,
+# fully populated filesystem that nothing mounts -- and with local-fs.target
+# failed, which on an Ubuntu cloud image means an emergency shell that a locked
+# root account cannot even log in to. A UUID lives in the filesystem superblock,
+# so a block-level snapshot carries it along with everything else.
+
 - name: Ensure Docker data volume is formatted as XFS
   community.general.filesystem:
     dev: "{{ storage_device }}"
     fstype: xfs
 
+- name: Read the Docker data volume's filesystem UUID
+  # -c /dev/null bypasses blkid's cache, which can still name a volume that has
+  # been replaced.
+  ansible.builtin.command:
+    argv: ["blkid", "-c", "/dev/null", "-s", "UUID", "-o", "value", "{{ storage_device }}"]
+  register: docker_storage_uuid
+  changed_when: false
+
+- name: Fail rather than write an fstab entry with no UUID
+  # The one failure this has to catch: an empty read becomes "UUID=" in fstab,
+  # which leaves the volume unmounted at the next boot rather than now.
+  ansible.builtin.assert:
+    that:
+      - docker_storage_uuid.stdout | trim is match('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+    fail_msg: >-
+      blkid read no filesystem UUID from {{ storage_device }}
+      (got {{ docker_storage_uuid.stdout | trim | default('nothing', true) }}).
+      Writing that to fstab would leave {{ storage_mount_point }} unmounted at
+      the next boot, so the play stops here instead.
+
 - name: Ensure the Docker data volume is mounted
   ansible.posix.mount:
     path: "{{ storage_mount_point }}"
-    src: "{{ storage_device }}"
+    src: "UUID={{ docker_storage_uuid.stdout | trim }}"
     fstype: xfs
     opts: pquota
     state: mounted
