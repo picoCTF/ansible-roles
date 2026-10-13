@@ -62,6 +62,40 @@
       next boot, so the play stops here instead.
   when: zot_storage_device | default('', true) | length > 0
 
+# Asked live rather than read from ansible_facts['mounts'], which is a snapshot
+# from play start. It decides whether this is a fresh provision or a host whose
+# store is already mounted and serving.
+- name: Check whether the image store volume is mounted
+  ansible.builtin.command:
+    argv: ["findmnt", "-no", "TARGET", "{{ zot_storage_root }}"]
+  register: zot_storage_mounted
+  changed_when: no
+  # 1 is findmnt's only failure code and covers "not a mount point", which is
+  # the fresh-provision case.
+  failed_when: zot_storage_mounted.rc not in [0, 1]
+  check_mode: false
+  when: zot_storage_device | default('', true) | length > 0
+
+- name: Ensure the image store volume is recorded in fstab, by UUID
+  # Deliberately "present" rather than "mounted". ansible.posix.mount's remount
+  # falls through to `umount` and then a fresh `mount` when the remount fails,
+  # and the fstab text does change on the migration run (device -> UUID=) -- so
+  # an unconditional state: mounted would aim that at a live image store.
+  ansible.posix.mount:
+    path: "{{ zot_storage_root }}"
+    src: "UUID={{ zot_storage_uuid.stdout | trim }}"
+    fstype: xfs
+    opts: "{{ zot_storage_mount_options }}"
+    state: present
+  # ansible.posix.mount writes fstab and nothing else; the unit systemd derives
+  # from it is only regenerated on a daemon-reload. Without this a run that
+  # changes the entry leaves systemd holding a unit naming the old device, and
+  # zot.service -- which now requires that mount -- refuses to start at the next
+  # restart.
+  notify:
+    - Reload systemd config
+  when: zot_storage_device | default('', true) | length > 0
+
 - name: Ensure the image store volume is mounted
   ansible.posix.mount:
     path: "{{ zot_storage_root }}"
@@ -69,7 +103,26 @@
     fstype: xfs
     opts: "{{ zot_storage_mount_options }}"
     state: mounted
-  when: zot_storage_device | default('', true) | length > 0
+  when:
+    - zot_storage_device | default('', true) | length > 0
+    - zot_storage_mounted.rc != 0
+
+# nofail cuts both ways. It keeps an unresolvable UUID off the boot path, but
+# mount(8) reads it as "do not report errors for this device if it does not
+# exist" -- so when UUID= does not resolve, `mount` exits 0 having mounted
+# nothing and the task above reports success. Without this the run is green
+# while zot_storage_root is an empty directory on the root disk that zot is
+# about to serve an empty registry from.
+- name: Confirm something is now mounted at the image store's mount point
+  ansible.builtin.command:
+    argv: ["findmnt", "-no", "TARGET", "{{ zot_storage_root }}"]
+  register: zot_storage_mounted_after
+  changed_when: no
+  failed_when: zot_storage_mounted_after.rc != 0
+  check_mode: false
+  when:
+    - zot_storage_device | default('', true) | length > 0
+    - not ansible_check_mode
 
 - name: Grow the image store filesystem if necessary
   # community.general.filesystem cannot grow XFS filesystems unless they are already
