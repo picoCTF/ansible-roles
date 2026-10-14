@@ -1,0 +1,34 @@
+---
+
+# Runs before config.yml. A config can name paths only the new unit provides
+# (LogsDirectory=), and zot acts on a config change while running: under the old
+# unit it panics on the missing path and restarts into the same panic.
+
+- name: Ensure zot systemd unit exists
+  ansible.builtin.template:
+    src: "zot.service.j2"
+    dest: "{{ systemd_unit_dir }}/zot.service"
+    lstrip_blocks: yes
+    force: yes
+    mode: "0644"
+  register: zot_unit
+
+- name: Load the changed zot unit
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when: zot_unit.changed
+
+- name: Check whether zot is running
+  ansible.builtin.command: systemctl is-active zot.service
+  register: zot_active
+  changed_when: false
+  failed_when: false
+  when: zot_unit.changed
+
+# Still on the config it has, which runs under the new unit as it did under the old.
+# A zot that is not running is started by service.yml, after the config.
+- name: Restart a running zot under the changed unit
+  ansible.builtin.systemd:
+    name: zot.service
+    state: restarted
+  when: zot_unit.changed and (zot_active.stdout | default('')) == 'active'

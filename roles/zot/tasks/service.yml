@@ -1,17 +1,7 @@
 ---
 
-# Configure zot to run as a systemd service.
-
-- name: Ensure zot systemd unit exists
-  ansible.builtin.template:
-    src: "zot.service.j2"
-    dest: "{{ systemd_unit_dir }}/zot.service"
-    lstrip_blocks: yes
-    force: yes
-    mode: "0644"
-  register: zot_unit
-  notify:
-    - Reload systemd config
+# Run zot as a systemd service. The unit itself is written by unit.yml, ahead of the
+# config, which also restarts a running zot when the unit changes.
 
 - name: Ensure zot service is enabled and started
   ansible.builtin.systemd:
@@ -19,12 +9,3 @@
     daemon_reload: yes
     enabled: yes
     state: started
-
-# A trampoline, not a handler: it notifies on a condition the templating task
-# cannot express by itself. Folding it into that task would lose the condition.
-- name: Determine whether to restart zot # noqa: no-handler
-  ansible.builtin.assert: { that: true, quiet: true }
-  changed_when: true
-  notify:
-    - Restart zot
-  when: zot_unit.changed

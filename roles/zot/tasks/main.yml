@@ -21,6 +21,12 @@
     apply:
       become: yes
 
+- ansible.builtin.include_tasks: unit.yml
+  when: zot_service_enabled | bool
+  args:
+    apply:
+      become: yes
+
 - ansible.builtin.include_tasks: config.yml
   args:
     apply:
