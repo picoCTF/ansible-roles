@@ -12,6 +12,18 @@
       zot_worker_identities must be a non-empty list of worker certificate CNs,
       e.g. ["worker"], and must not name cmgr, the orchestrator's read-write identity.
 
+# zot writes audit events at info and filters them by the main log level, so
+# below info the audit log stays empty.
+- name: Assert the log level lets the audit log record anything
+  ansible.builtin.assert:
+    that:
+      - zot_log_level | lower in ['trace', 'debug', 'info']
+    fail_msg: >-
+      zot_audit_log needs zot_log_level "info" (or "debug"): zot filters audit
+      events by the main level, so at "{{ zot_log_level }}" the audit log would
+      stay empty.
+  when: zot_audit_log | bool
+
 - name: Ensure zot config file exists
   ansible.builtin.template:
     src: "config.json.j2"
@@ -21,3 +33,16 @@
     mode: "0644"
   notify:
     - Restart zot
+
+- name: Ensure zot's log files are rotated
+  ansible.builtin.template:
+    src: "logrotate.j2"
+    dest: "/etc/logrotate.d/zot"
+    mode: "0644"
+  when: zot_log_file | bool or zot_audit_log | bool
+
+- name: Ensure no rotation is configured for log files zot no longer writes
+  ansible.builtin.file:
+    path: "/etc/logrotate.d/zot"
+    state: absent
+  when: not (zot_log_file | bool or zot_audit_log | bool)

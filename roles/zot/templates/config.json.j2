@@ -38,7 +38,8 @@
       }
     }
   },
-  "log": {
-    "level": "{{ zot_log_level }}"
-  }
+  "log": {{ {'level': zot_log_level}
+            | combine({'output': zot_log_path} if zot_log_file | bool else {})
+            | combine({'audit': zot_audit_log_path} if zot_audit_log | bool else {})
+            | to_json }}
 }

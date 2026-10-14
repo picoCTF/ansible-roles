@@ -17,3 +17,9 @@ zot_download_url: "https://github.com/project-zot/zot/releases/download/{{ zot_v
 zot_install_marker: "{{ zot_config_dir }}/.installed-source"
 
 systemd_unit_dir: "/etc/systemd/system/"
+
+# Fixed rather than configurable: the unit's LogsDirectory=zot creates this directory
+# for the service user, and it is the only writable path under /var/log.
+zot_log_dir: "/var/log/zot"
+zot_log_path: "{{ zot_log_dir }}/zot.log"
+zot_audit_log_path: "{{ zot_log_dir }}/audit.log"

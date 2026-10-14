@@ -1,0 +1,13 @@
+# zot keeps its log files open, so they are truncated in place rather than moved.
+# su: the directory belongs to the service user, which logrotate refuses otherwise.
+{{ zot_log_dir }}/*.log {
+    su {{ zot_user }} {{ zot_user }}
+    daily
+    maxsize 100M
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
