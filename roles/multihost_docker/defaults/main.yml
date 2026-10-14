@@ -114,7 +114,8 @@ docker_reaper_command: "containers --filter label=cmgr.dynamic=true --min-age 30
 # target must outlast container data's daily swing (~2 points), or peaks alone evict images.
 # --disk-path saves the /info call the reaper otherwise makes on every run to find the data-root.
 # --max-size: images that would free more are the slow re-pulls, so they go only once nothing
-# else is left.
+# else is left. An empty string disables the image sweep, as on workers whose images cork
+# preloads: there the preload decides what stays.
 docker_reaper_images_command: "images --threshold 93 --target 88 --max-size 512MiB --disk-path {{ docker_data_root }}"
 # Sweeps containerd shims left behind by containers that no longer exist, which
 # otherwise hold ~5 MiB each until the host reboots. A shim is only signalled once

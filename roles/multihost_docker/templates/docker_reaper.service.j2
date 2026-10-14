@@ -1,4 +1,6 @@
+{# The use record keeps running with the image sweep off, so eviction resumes in order when it is back. #}
 {% set lru = docker_reaper_images_lru | bool %}
+{% set images_command = docker_reaper_images_command | default('', true) %}
 [Unit]
 Description=docker-reaper
 Documentation=https://github.com/picoCTF/docker-reaper
@@ -12,7 +14,9 @@ Type=oneshot
 StateDirectory=docker-reaper
 {% endif %}
 ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_command }}{{ (' --record-image-use ' ~ docker_reaper_image_use_record) if lru else '' }}
-ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_images_command }}{{ (' --lru ' ~ docker_reaper_image_use_record ~ ((' --stale-after ' ~ docker_reaper_images_stale_after) if docker_reaper_images_stale_after else '')) if lru else '' }}
+{% if images_command %}
+ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ images_command }}{{ (' --lru ' ~ docker_reaper_image_use_record ~ ((' --stale-after ' ~ docker_reaper_images_stale_after) if docker_reaper_images_stale_after else '')) if lru else '' }}
+{% endif %}
 {% if docker_reaper_shims_command %}
 ExecStart={{ docker_reaper_install_path }}/docker-reaper {{ docker_reaper_shims_command }} --data-root {{ docker_data_root }}
 {% endif %}
