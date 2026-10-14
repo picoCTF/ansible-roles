@@ -49,3 +49,8 @@ zot_storage_mount_options: "defaults,noatime,nofail,x-systemd.device-timeout=30s
 
 zot_deploy_certs: yes
 zot_cert_src: "./docker-certs"
+
+# CNs of the workers' read-only client certificates. A name left off this list
+# is refused, which is how a leaked worker certificate is revoked. List the old
+# and new names together while workers roll onto a re-issued certificate.
+zot_worker_identities: ["worker"]

@@ -1,5 +1,17 @@
 ---
 
+# A bare string would template as a JSON string, which zot rejects at startup.
+- name: Assert the worker identities are a list of names
+  ansible.builtin.assert:
+    that:
+      - zot_worker_identities is sequence
+      - zot_worker_identities is not string
+      - zot_worker_identities | length > 0
+      - "'cmgr' not in zot_worker_identities"
+    fail_msg: >-
+      zot_worker_identities must be a non-empty list of worker certificate CNs,
+      e.g. ["worker"], and must not name cmgr, the orchestrator's read-write identity.
+
 - name: Ensure zot config file exists
   ansible.builtin.template:
     src: "config.json.j2"
