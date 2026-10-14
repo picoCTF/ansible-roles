@@ -1,6 +1,18 @@
 ---
-zot_version: "v2.1.18"
+zot_version: "v2.1.22"
+
+# sha256 of each release asset, from the release's checksums.sha256.txt. Raising
+# zot_version means adding its entry here; a version with no entry fails the play
+# rather than installing unverified.
+zot_checksums:
+  v2.1.22:
+    amd64: "sha256:33b9b5bfe05d6788c076de951a01920477dbd6395c330146e23cc2340073e52e"
+    arm64: "sha256:abc9bab13c144a4ee2f9067a6bbbe70ca1c018c49dbf521db28975514ea705da"
+# Overrides zot_checksums, for a version the role does not list.
 zot_checksum: ""
+
+# The role refuses to install a release older than the one already installed.
+zot_allow_downgrade: no
 
 zot_service_enabled: yes
 zot_address: "0.0.0.0"
