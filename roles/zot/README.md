@@ -51,8 +51,10 @@ from the existing zot CA under a new CN (cork's `gen-docker-certs.sh` with
 
 | Name | Description | Default |
 | --- | --- | --- |
-| zot_version | Upstream zot release tag to install. | `v2.1.18` |
-| zot_checksum | Optional checksum for the download, e.g. `sha256:...`. Empty = unverified. Upstream publishes `checksums.sha256.txt` in each release. | `""` |
+| zot_version | Upstream zot release tag to install. | `v2.1.22` |
+| zot_checksums | sha256 of each release asset, by version and architecture, from the release's `checksums.sha256.txt`. The download is always verified: a `zot_version` with no entry here (and no `zot_checksum`) fails the play. | entries for `v2.1.22` |
+| zot_checksum | Overrides `zot_checksums`, e.g. `sha256:...`, for a version the role does not list. | `""` |
+| zot_allow_downgrade | Allow installing a release older than the one installed. Off, the role fails instead. | `false` |
 | zot_service_enabled | Whether to run zot as a systemd service. | `true` |
 | zot_address | Bind address. | `0.0.0.0` |
 | zot_port | Listen port (string, per zot config). | `"5000"` |
@@ -73,10 +75,11 @@ from the existing zot CA under a new CN (cork's `gen-docker-certs.sh` with
 Because `zot_download_url` is in `vars/` rather than `defaults/`, it cannot be overridden
 to point at a mirror or an air-gapped artifact store.
 
-Changing `zot_version` is all that is needed to move between releases, in either
-direction. zot exposes no version flag, so the role records each install's download URL in
-`/etc/zot/.installed-source` and reinstalls whenever that no longer matches — removing the
-marker forces a reinstall on the next run.
+Moving to a newer release takes `zot_version` and its `zot_checksums` entry. Going back to an
+older one also takes `zot_allow_downgrade: true`. zot exposes no version flag, so the role
+records each install's download URL in `/etc/zot/.installed-source`, reads the installed
+version from it, and reinstalls whenever it no longer matches. Removing the marker forces a
+reinstall on the next run, and skips the downgrade check.
 
 ## Usage
 
