@@ -7,6 +7,13 @@ zot_address: "0.0.0.0"
 zot_port: "5000"
 zot_log_level: "warning"
 
+# Write zot's log to a file instead of stdout (the journal), and an audit log of
+# writes, with the client's identity, to a file of its own. Both go to /var/log/zot
+# and are rotated by logrotate. Requests are logged at "info"; at "warning" the log
+# file holds none.
+zot_log_file: no
+zot_audit_log: no
+
 # HTTP read and write deadlines, as Go duration strings. zot's own default for
 # both is 60s, and that is a deadline on the WHOLE request rather than an idle
 # timeout -- so it bounds how long a single blob may take to transfer, however

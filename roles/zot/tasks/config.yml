@@ -21,3 +21,16 @@
     mode: "0644"
   notify:
     - Restart zot
+
+- name: Ensure zot's log files are rotated
+  ansible.builtin.template:
+    src: "logrotate.j2"
+    dest: "/etc/logrotate.d/zot"
+    mode: "0644"
+  when: zot_log_file | bool or zot_audit_log | bool
+
+- name: Ensure no rotation is configured for log files zot no longer writes
+  ansible.builtin.file:
+    path: "/etc/logrotate.d/zot"
+    state: absent
+  when: not (zot_log_file | bool or zot_audit_log | bool)

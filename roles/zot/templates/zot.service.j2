@@ -22,6 +22,11 @@ RestartSec=1
 User={{ zot_user }}
 Group={{ zot_user }}
 ReadWritePaths={{ zot_storage_root }}
+{% if zot_log_file | bool or zot_audit_log | bool %}
+# /var/log/zot, created for the service user and writable despite ProtectSystem.
+LogsDirectory=zot
+LogsDirectoryMode=0750
+{% endif %}
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
