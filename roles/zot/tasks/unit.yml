@@ -13,12 +13,14 @@
     mode: "0644"
   register: zot_unit
 
-- name: Load the changed zot unit
+# Tasks, not handlers: these must run before config.yml, and handlers run after.
+- name: Load the changed zot unit # noqa: no-handler
   ansible.builtin.systemd:
     daemon_reload: yes
   when: zot_unit.changed
 
-- name: Check whether zot is running
+# A read-only probe; service_facts would gather every unit to answer for one.
+- name: Check whether zot is running # noqa: command-instead-of-module no-handler
   ansible.builtin.command: systemctl is-active zot.service
   register: zot_active
   changed_when: false
