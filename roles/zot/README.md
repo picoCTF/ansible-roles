@@ -35,6 +35,18 @@ role copies `zot-ca-cert.pem`, `zot-server-cert.pem`, and `zot-server-key.pem` t
 key is handed to the service via systemd `LoadCredential` and read from
 `/run/credentials/zot.service/`.
 
+### Rotating the worker identity
+
+Clients are identified by their certificate's CN, and zot has no revocation list, so a
+leaked worker certificate is revoked by renaming the identity. Issue a new worker leaf
+from the existing zot CA under a new CN (cork's `gen-docker-certs.sh` with
+`LEAVES=zot-worker ZOT_WORKER_CN=<new name>`), then set `zot_worker_identities` to:
+
+- `["<old>", "<new>"]` for a planned rotation, while workers move to the new certificate,
+  then `["<new>"]`;
+- `["<new>"]` straight away when the old certificate is compromised. Workers still holding
+  it can no longer pull.
+
 ## Role Variables
 
 | Name | Description | Default |
@@ -50,6 +62,7 @@ key is handed to the service via systemd `LoadCredential` and read from
 | zot_log_level | zot log level. | `warning` |
 | zot_read_timeout | `http.readTimeout`, a Go duration. zot defaults both timeouts to 60s, and they bound the **whole request**, not idle time — so 60s caps how long any single blob may take. A 2 GB layer needs ~34 MB/s sustained to fit, and one that does not is cut off mid-body: zot logs an `i/o timeout` in `PatchBlobUpload` and the pusher sees "use of closed network connection". `0` disables the bound entirely. | `30m` |
 | zot_write_timeout | `http.writeTimeout`, the same in the serving direction — many workers pulling large images at launch. | `30m` |
+| zot_worker_identities | CNs granted read on every repository: the workers' pull certificates. Must be a non-empty list and must not include `cmgr`. See [Rotating the worker identity](#rotating-the-worker-identity). | `["worker"]` |
 | zot_deploy_certs | Whether to deploy the three server certs from the controller. | `true` |
 | zot_cert_src | Path **on the Ansible controller** holding `zot-ca-cert.pem`, `zot-server-cert.pem`, `zot-server-key.pem`. | `./docker-certs` |
 

@@ -28,7 +28,7 @@
               "actions": ["read", "create", "update", "delete"]
             },
             {
-              "users": ["worker"],
+              "users": {{ zot_worker_identities | to_json }},
               "actions": ["read"]
             }
           ],
